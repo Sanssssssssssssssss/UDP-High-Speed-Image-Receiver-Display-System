@@ -3,11 +3,11 @@
 ## 🚀 Project Overview
 This project implements a **high-speed UDP image data receiver and display system**, capable of handling **24,000 packets per second**, each **1300 bytes**, to reconstruct and render real-time images. The system efficiently receives **raw image data over UDP**, processes it, and visualizes it using `QImage`. The software is optimized for **low-latency image rendering**, making it ideal for real-time applications like high-speed vision systems and industrial imaging.
 
-### 🎥 Embedded System Need for the Software
+### 🎥 Embedded System Needed for the Software
 - The Xilinx FPGA work as embedded system are required for this software, the dataflow pipeline are shows in graph below:
 - ![image](https://github.com/user-attachments/assets/b0fc7950-9bdb-48c0-bc12-6f7179a92130)
-- Support molecular migration and second creation
-- High speed hardware accelerated SIMD structure for image data analysis and processing
+- Support **molecular migration** and second creation
+- **High speed hardware accelerated SIMD structure** for image data analysis and processing
 - Visit another project page for the code: https://github.com/Sanssssssssssssssss/endoscopic-image-acquisition-system
 
 ## 🔥 Key Features
