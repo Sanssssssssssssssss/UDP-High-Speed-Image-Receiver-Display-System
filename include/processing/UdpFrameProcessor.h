@@ -5,8 +5,10 @@
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QQueue>
 #include <QImage>
 #include <QList>
+#include <QMetaObject>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QPainter>
@@ -45,7 +47,8 @@ protected:
 
 private slots:
     void updateFPS();
-    void processFrameBatch(const QList<QByteArray> &batch);
+    void enqueueFrameBatch(const QList<QByteArray> &batch);
+    void drainPendingBatches();
 
 private:
     static bool isMarkerPacket(const QByteArray &data, char marker);
@@ -67,10 +70,18 @@ private:
     quint64 recoveredLinesThisSecond;
     quint64 frameProcessingNsThisSecond;
     quint64 interpolationNsThisSecond;
+    quint64 droppedPacketsThisSecond;
+    quint64 droppedBatchesThisSecond;
+    quint64 maxQueuedPacketsThisSecond;
     int currentLine;
     bool frameValid;
     QVector<QByteArray> frameBuffer;
     QVector<bool> receivedLineFlags;
+    QQueue<QList<QByteArray> > pendingBatches;
+    QMutex pendingBatchMutex;
+    int pendingPacketCount;
+    bool drainScheduled;
+    bool parserResyncPending;
 
     UdpReceiver *receiver;
     QThread *receiverThread;

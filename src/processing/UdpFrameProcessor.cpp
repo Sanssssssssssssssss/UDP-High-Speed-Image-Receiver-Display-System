@@ -8,6 +8,9 @@ namespace {
 const int kPacketHeaderSize = 4;
 const int kFrameWidth = 400;
 const int kFrameHeight = 400;
+const int kPacketsPerFrame = kFrameHeight + 2;
+const int kMaxQueuedFrames = 6;
+const int kMaxQueuedPackets = kPacketsPerFrame * kMaxQueuedFrames;
 
 template <typename T>
 T clampValue(T value, T low, T high) {
@@ -39,10 +42,16 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
       recoveredLinesThisSecond(0),
       frameProcessingNsThisSecond(0),
       interpolationNsThisSecond(0),
+      droppedPacketsThisSecond(0),
+      droppedBatchesThisSecond(0),
+      maxQueuedPacketsThisSecond(0),
       currentLine(0),
       frameValid(false),
       frameBuffer(kFrameHeight),
       receivedLineFlags(kFrameHeight, false),
+      pendingPacketCount(0),
+      drainScheduled(false),
+      parserResyncPending(false),
       receiver(nullptr),
       receiverThread(nullptr),
       flipHorizontal(false),
@@ -67,7 +76,7 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
     receiverThread = new QThread();
     receiver->moveToThread(receiverThread);
     connect(receiverThread, &QThread::started, receiver, [=]() { receiver->startReceiving("0.0.0.0", 8080); });
-    connect(receiver, &UdpReceiver::newFrameBatch, this, &UdpFrameProcessor::processFrameBatch, Qt::QueuedConnection);
+    connect(receiver, &UdpReceiver::newFrameBatch, this, &UdpFrameProcessor::enqueueFrameBatch, Qt::DirectConnection);
     connect(receiverThread, &QThread::finished, receiverThread, &QObject::deleteLater);
     receiverThread->start();
 }
@@ -195,11 +204,14 @@ void UdpFrameProcessor::updateFPS() {
     const double avgInterpolationMs = completedFramesThisSecond > 0
         ? static_cast<double>(interpolationNsThisSecond) / static_cast<double>(completedFramesThisSecond) / 1000000.0
         : 0.0;
-    const QString statsText = QString("Perf: pkts/s=%1 | frame=%2 ms | interp=%3 ms | recovered lines/s=%4")
+    const QString statsText = QString("Perf: pkts/s=%1 | frame=%2 ms | interp=%3 ms | recovered lines/s=%4 | dropped pkts/s=%5 | queue max=%6/%7")
                                   .arg(datagramsThisSecond)
                                   .arg(avgFrameMs, 0, 'f', 3)
                                   .arg(avgInterpolationMs, 0, 'f', 3)
-                                  .arg(recoveredLinesThisSecond);
+                                  .arg(recoveredLinesThisSecond)
+                                  .arg(droppedPacketsThisSecond)
+                                  .arg(maxQueuedPacketsThisSecond)
+                                  .arg(kMaxQueuedPackets);
     emit performanceStatsChanged(statsText);
 
     frameCount = 0;
@@ -208,11 +220,69 @@ void UdpFrameProcessor::updateFPS() {
     recoveredLinesThisSecond = 0;
     frameProcessingNsThisSecond = 0;
     interpolationNsThisSecond = 0;
+    droppedPacketsThisSecond = 0;
+    droppedBatchesThisSecond = 0;
+    maxQueuedPacketsThisSecond = 0;
 }
 
-void UdpFrameProcessor::processFrameBatch(const QList<QByteArray> &batch) {
-    for (QList<QByteArray>::const_iterator it = batch.cbegin(); it != batch.cend(); ++it) {
-        processFrameData(*it);
+void UdpFrameProcessor::enqueueFrameBatch(const QList<QByteArray> &batch) {
+    if (batch.isEmpty()) {
+        return;
+    }
+
+    bool shouldScheduleDrain = false;
+    {
+        QMutexLocker lock(&pendingBatchMutex);
+        pendingBatches.enqueue(batch);
+        pendingPacketCount += batch.size();
+        maxQueuedPacketsThisSecond = std::max(maxQueuedPacketsThisSecond, static_cast<quint64>(pendingPacketCount));
+
+        while (pendingPacketCount > kMaxQueuedPackets && !pendingBatches.isEmpty()) {
+            const QList<QByteArray> droppedBatch = pendingBatches.dequeue();
+            pendingPacketCount -= droppedBatch.size();
+            droppedPacketsThisSecond += droppedBatch.size();
+            ++droppedBatchesThisSecond;
+            parserResyncPending = true;
+        }
+
+        if (!drainScheduled) {
+            drainScheduled = true;
+            shouldScheduleDrain = true;
+        }
+    }
+
+    if (shouldScheduleDrain) {
+        QMetaObject::invokeMethod(this, "drainPendingBatches", Qt::QueuedConnection);
+    }
+}
+
+void UdpFrameProcessor::drainPendingBatches() {
+    while (true) {
+        QList<QByteArray> batch;
+        bool needResync = false;
+        {
+            QMutexLocker lock(&pendingBatchMutex);
+            if (pendingBatches.isEmpty()) {
+                drainScheduled = false;
+                return;
+            }
+
+            batch = pendingBatches.dequeue();
+            pendingPacketCount -= batch.size();
+            needResync = parserResyncPending;
+            parserResyncPending = false;
+        }
+
+        if (needResync) {
+            frameValid = false;
+            currentLine = 0;
+            frameBuffer.fill(QByteArray());
+            receivedLineFlags.fill(false);
+        }
+
+        for (QList<QByteArray>::const_iterator it = batch.cbegin(); it != batch.cend(); ++it) {
+            processFrameData(*it);
+        }
     }
 }
 

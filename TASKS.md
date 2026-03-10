@@ -40,6 +40,8 @@
 - [x] Remove periodic receiver-side UDP buffer clearing that was discarding pending datagrams.
 - [x] Batch UDP datagrams across the receiver-thread to processor-thread handoff to reduce queue pressure.
 - [x] Increase the requested UDP socket receive buffer on startup.
+- [x] Upgrade the built-in UDP demo sender to a 60 fps stress mode at roughly 24k packets per second.
+- [x] Add a bounded pending-batch queue with overload dropping and resync behavior on the processor side.
 - [x] Add VS Code workspace files and a local Windows PowerShell toolchain detection script.
 - [x] Install a local Qt 5.15.2 + MinGW 8.1 + OpenCV 3.4.8 toolchain under `.local/toolchain`.
 - [x] Configure user environment variables `QT_QMAKE`, `MINGW_MAKE`, `GDB_PATH`, and `OPENCV_ROOT`.

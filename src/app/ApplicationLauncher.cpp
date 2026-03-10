@@ -28,21 +28,27 @@ record video.
 #include <QLabel>
 #include <QFont>
 #include <QSizePolicy>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QUdpSocket>
 #include <QVBoxLayout>
 #include <QWidget>
 
 namespace {
+const qint64 kDemoFrameIntervalNs = 1000000000LL / 60LL;
+
 class LocalDemoSender : public QObject {
 public:
     explicit LocalDemoSender(QObject *parent = nullptr)
         : QObject(parent),
           socket(new QUdpSocket(this)),
           timer(new QTimer(this)),
-          frameIndex(0) {
-        connect(timer, &QTimer::timeout, this, [this]() { sendFrame(); });
-        timer->start(33);
+          frameIndex(0),
+          nextFrameDeadlineNs(0) {
+        timer->setTimerType(Qt::PreciseTimer);
+        connect(timer, &QTimer::timeout, this, [this]() { sendDueFrames(); });
+        cadenceTimer.start();
+        timer->start(1);
     }
 
 private:
@@ -97,9 +103,23 @@ private:
         ++frameIndex;
     }
 
+    void sendDueFrames() {
+        const qint64 nowNs = cadenceTimer.nsecsElapsed();
+        if (nextFrameDeadlineNs == 0) {
+            nextFrameDeadlineNs = nowNs;
+        }
+
+        while (nowNs >= nextFrameDeadlineNs) {
+            sendFrame();
+            nextFrameDeadlineNs += kDemoFrameIntervalNs;
+        }
+    }
+
     QUdpSocket *socket;
     QTimer *timer;
     int frameIndex;
+    QElapsedTimer cadenceTimer;
+    qint64 nextFrameDeadlineNs;
 };
 }
 
@@ -180,7 +200,7 @@ int runApplication(int argc, char *argv[]) {
     videoTitle->setObjectName("VideoTitle");
     videoHeaderTextLayout->addWidget(videoTitle);
 
-    auto *videoSubtitle = new QLabel("Local demo traffic is active so the full receive -> reconstruct -> display path stays testable at startup.", videoPanel);
+    auto *videoSubtitle = new QLabel("Local demo traffic now stresses the receiver at 60 fps and about 24k UDP packets per second so the full receive path stays measurable at startup.", videoPanel);
     videoSubtitle->setObjectName("VideoSubtitle");
     videoSubtitle->setWordWrap(true);
     videoHeaderTextLayout->addWidget(videoSubtitle);

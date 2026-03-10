@@ -93,5 +93,5 @@
 ## D-016 Remove destructive UDP buffer clearing and batch cross-thread packet delivery
 - Status: Accepted
 - Date: 2026-03-10
-- Decision: the receiver must not periodically discard pending datagrams, and packet delivery from the socket thread to the UI-side processor should be batched rather than queued one datagram at a time.
-- Reason: periodic buffer clearing was an explicit packet-loss source, and per-datagram queued delivery adds avoidable event-loop pressure under high-rate traffic.
+- Decision: the receiver must not periodically discard pending datagrams, packet delivery from the socket thread to the UI-side processor should be batched rather than queued one datagram at a time, and the user-space pending queue must remain bounded to a small number of frame-equivalents.
+- Reason: periodic buffer clearing was an explicit packet-loss source, per-datagram queued delivery adds avoidable event-loop pressure under high-rate traffic, and an unbounded pending queue would hide overload until latency becomes unusable.

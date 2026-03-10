@@ -15,6 +15,8 @@
 - Video recording now initializes from the processed display frame instead of the stale raw path.
 - The desktop UI now uses a larger right-side control area, and the control text and interactive widgets have been enlarged further while keeping the current title hierarchy and black non-gradient palette.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
+- The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
+- The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
 - A `.vscode` workspace and `scripts/vscode-qt.ps1` toolchain script have been added for this machine.
 - A local Qt 5.15.2 + MinGW 8.1 + OpenCV 3.4.8 toolchain is now installed under `.local/toolchain`.
 - The project now builds successfully through the VS Code task flow, and the executable has passed a startup smoke test on this machine.
