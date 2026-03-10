@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Toolchain: Diagnose local Qt environment",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
+        "-Action",
+        "Diagnose"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: newudp (Debug)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
+        "-Action",
+        "Build"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": "Toolchain: Diagnose local Qt environment",
+      "dependsOrder": "sequence",
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "Run: newudp (Demo)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
+        "-Action",
+        "Run"
+      ],
+      "dependsOn": "Build: newudp (Debug)",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ]
+}

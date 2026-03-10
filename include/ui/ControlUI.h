@@ -43,6 +43,7 @@ public slots:
 public slots:
     // FPS update
     void onFPSChanged(int fps);
+    void onPerformanceStatsChanged(const QString &statsText);
 
 private slots:
     // Brightness adjustment
@@ -75,6 +76,7 @@ private slots:
 private:
     // UI elements
     QLabel *fpsLabel;                  // Label to display FPS
+    QLabel *performanceLabel;          // Label to display performance stats
     QSlider *brightnessSlider;         // Brightness slider
     QLabel *brightnessValueLabel;      // Label to display brightness value
     QSlider *gammaSlider;              // Gamma slider

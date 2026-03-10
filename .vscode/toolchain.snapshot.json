@@ -1,0 +1,9 @@
+﻿{
+    "Workspace":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System",
+    "QMake":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System\\.local\\toolchain\\Qt\\5.15.2\\mingw81_64\\bin\\qmake.exe",
+    "MingwMake":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System\\.local\\toolchain\\Qt\\Tools\\mingw810_64\\bin\\mingw32-make.exe",
+    "Gdb":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System\\.local\\toolchain\\Qt\\Tools\\mingw810_64\\bin\\gdb.exe",
+    "OpenCVRoot":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System\\.local\\toolchain\\OpenCV-3.4.8-x64",
+    "BuildDir":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System\\build-vscode",
+    "ExePath":  "D:\\GPT_Project\\UDP-High-Speed-Image-Receiver-Display-System\\build-vscode\\debug\\newudp.exe"
+}

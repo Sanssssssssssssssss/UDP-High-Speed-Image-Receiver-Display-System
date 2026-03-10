@@ -1,0 +1,27 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Windows",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/.local/toolchain/OpenCV-3.4.8-x64/include",
+        "D:/OpenCV-MinGW-1/include",
+        "C:/OpenCV-MinGW-1/include",
+        "${workspaceFolder}/.local/toolchain/Qt/5.15.2/mingw81_64/include",
+        "${workspaceFolder}/.local/toolchain/Qt/5.15.2/mingw81_64/include/**",
+        "D:/Qt/**/include",
+        "C:/Qt/**/include"
+      ],
+      "defines": [
+        "_WINDOWS",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "compilerPath": "${workspaceFolder}/.local/toolchain/Qt/Tools/mingw810_64/bin/g++.exe",
+      "cppStandard": "c++11",
+      "intelliSenseMode": "windows-gcc-x64"
+    }
+  ]
+}

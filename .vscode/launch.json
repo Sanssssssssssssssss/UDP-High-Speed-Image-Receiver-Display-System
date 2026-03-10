@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: newudp (Demo)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-vscode/debug/newudp.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "PATH",
+          "value": "${workspaceFolder}\\.local\\toolchain\\Qt\\Tools\\mingw810_64\\bin;${workspaceFolder}\\.local\\toolchain\\Qt\\5.15.2\\mingw81_64\\bin;${workspaceFolder}\\.local\\toolchain\\OpenCV-3.4.8-x64\\x64\\mingw\\bin;${env:PATH}"
+        },
+        {
+          "name": "OPENCV_ROOT",
+          "value": "${workspaceFolder}\\.local\\toolchain\\OpenCV-3.4.8-x64"
+        }
+      ],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "${workspaceFolder}\\.local\\toolchain\\Qt\\Tools\\mingw810_64\\bin\\gdb.exe",
+      "preLaunchTask": "Build: newudp (Debug)"
+    }
+  ]
+}

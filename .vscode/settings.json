@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.pro": "qmake"
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
+}

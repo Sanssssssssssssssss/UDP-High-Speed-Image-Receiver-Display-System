@@ -10,27 +10,28 @@ This file implements the UdpReceiver class,
 which is responsible for receiving UDP packets,
 managing the network interface using Tshark, and
 emitting processed frame data to be used by
-the frame processor. It includes functionalities
-such as buffer clearing, real-time data capturing,
-and packet processing.
+the frame processor.
 ===================================================
 */
 
 #include "UdpReceiver.h"
+#include <QAbstractSocket>
 #include <QDebug>
+#include <QFileInfo>
+
+namespace {
+const int kDesiredReceiveBufferBytes = 16 * 1024 * 1024;
+const int kMaxBatchPackets = 256;
+}
 
 UdpReceiver::UdpReceiver(QObject *parent)
     : QObject(parent),
       mrecv(new QUdpSocket(this)),
-      tsharkProcess(new QProcess(this)),
-      bufferCleaner(new QTimer(this)) {
-    // Periodically clear the buffer every 10 seconds
-    connect(bufferCleaner, &QTimer::timeout, this, &UdpReceiver::clearBuffer);
-    bufferCleaner->start(10000); // Clear buffer every 10 seconds
+      tsharkProcess(new QProcess(this)) {
+    qRegisterMetaType<QList<QByteArray> >("QList<QByteArray>");
 }
 
 UdpReceiver::~UdpReceiver() {
-    // Gracefully terminate the Tshark process
     if (tsharkProcess && tsharkProcess->state() == QProcess::Running) {
         tsharkProcess->terminate();
         if (!tsharkProcess->waitForFinished(3000)) {
@@ -44,36 +45,45 @@ UdpReceiver::~UdpReceiver() {
 void UdpReceiver::startReceiving(const QString &address, quint16 port) {
     QHostAddress maddr(address);
 
-    // Bind to the specified address and port
     if (!mrecv->bind(maddr, port, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
         qWarning() << "Failed to bind to address:" << address << "port:" << port;
         return;
     }
 
-    qDebug() << "Listening for UDP packets on" << address << "port" << port;
+    mrecv->setReadBufferSize(kDesiredReceiveBufferBytes);
+    mrecv->setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption, kDesiredReceiveBufferBytes);
+    qDebug() << "Listening for UDP packets on" << address << "port" << port
+             << "requested receive buffer =" << kDesiredReceiveBufferBytes
+             << "actual receive buffer =" << mrecv->socketOption(QAbstractSocket::ReceiveBufferSizeSocketOption).toInt();
 
-    // Connect the signal to process incoming data
     connect(mrecv, &QUdpSocket::readyRead, this, &UdpReceiver::readPendingDatagrams);
+    connect(mrecv, &QUdpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError socketError) {
+        Q_UNUSED(socketError);
+        qWarning() << "UDP socket error:" << mrecv->errorString();
+    });
 }
 
 void UdpReceiver::startTshark(const QString &interfaceName) {
     QString program = "D:/Program Files (x86)/Wireshark/tshark.exe";
     QString deviceName = interfaceName.isEmpty() ? "Ethernet 2" : interfaceName;
 
-    // Set up circular buffer parameters
+    if (!QFileInfo::exists(program)) {
+        qWarning() << "Tshark executable not found, skipping capture bootstrap:" << program;
+        return;
+    }
+
     QStringList arguments = {
-        "-i", deviceName,          // Specify network interface to listen on
-        "-l",                      // Enable real-time output
-        "-n",                      // Disable hostname resolution
-        "-b", "filesize:3145728",  // Maximum file size of 3GB (unit: KB)
-        "-b", "files:3",           // Keep up to 3 files
-        "-w", "E:/sharkfile/capture.pcap"  // Set capture file save path
+        "-i", deviceName,
+        "-l",
+        "-n",
+        "-b", "filesize:3145728",
+        "-b", "files:3",
+        "-w", "E:/sharkfile/capture.pcap"
     };
 
     qDebug() << "Starting tshark with program:" << program << "arguments:" << arguments;
     tsharkProcess->start(program, arguments);
 
-    // Capture error output
     connect(tsharkProcess, &QProcess::readyReadStandardError, this, [=]() {
         QByteArray errorOutput = tsharkProcess->readAllStandardError();
         if (!errorOutput.isEmpty()) {
@@ -81,7 +91,6 @@ void UdpReceiver::startTshark(const QString &interfaceName) {
         }
     });
 
-    // Check if Tshark started successfully
     if (!tsharkProcess->waitForStarted()) {
         qWarning() << "Failed to start tshark. Error:" << tsharkProcess->errorString();
     } else {
@@ -90,33 +99,29 @@ void UdpReceiver::startTshark(const QString &interfaceName) {
 }
 
 void UdpReceiver::readPendingDatagrams() {
-    // Read incoming packets in bulk
+    QList<QByteArray> batch;
+    batch.reserve(kMaxBatchPackets);
+
     while (mrecv->hasPendingDatagrams()) {
         QByteArray datagram;
         datagram.resize(mrecv->pendingDatagramSize());
-        mrecv->readDatagram(datagram.data(), datagram.size());
+        const qint64 bytesRead = mrecv->readDatagram(datagram.data(), datagram.size());
+        if (bytesRead <= 0) {
+            qWarning() << "Failed to read UDP datagram:" << mrecv->errorString();
+            continue;
+        }
 
-        // Emit signal when a new frame is received
         if (!datagram.isEmpty()) {
-            emit newFrameData(datagram);
+            batch.push_back(datagram);
+        }
+
+        if (batch.size() >= kMaxBatchPackets) {
+            emit newFrameBatch(batch);
+            batch.clear();
         }
     }
+
+    if (!batch.isEmpty()) {
+        emit newFrameBatch(batch);
+    }
 }
-
-#include <QtConcurrent>
-
-void UdpReceiver::clearBuffer() {
-    QtConcurrent::run([this]() {
-        int packetsCleared = 0;
-
-        while (mrecv->hasPendingDatagrams()) {
-            mrecv->readDatagram(nullptr, 0); // Discard the packet
-            packetsCleared++;
-        }
-
-        qDebug() << "Cleared" << packetsCleared << "datagrams from buffer.";
-    });
-}
-
-
-
