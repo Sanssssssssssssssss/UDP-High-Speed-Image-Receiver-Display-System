@@ -6,7 +6,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build-vscode/debug/newudp.exe",
-      "args": [],
+      "args": ["--demo"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [

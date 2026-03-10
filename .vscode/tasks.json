@@ -45,7 +45,8 @@
         "-File",
         "${workspaceFolder}\\scripts\\vscode-qt.ps1",
         "-Action",
-        "Run"
+        "Run",
+        "-Demo"
       ],
       "dependsOn": "Build: newudp (Debug)",
       "dependsOrder": "sequence",

@@ -1,7 +1,8 @@
 param(
     [ValidateSet("Diagnose", "Build", "Run")]
     [string]$Action = "Diagnose",
-    [string]$BuildDir = "build-vscode"
+    [string]$BuildDir = "build-vscode",
+    [switch]$Demo
 )
 
 Set-StrictMode -Version Latest
@@ -189,7 +190,12 @@ function Invoke-Run {
     $opencvBin = Join-Path $toolchain.OpenCVRoot "x64\\mingw\\bin"
     $env:PATH = "$mingwBin;$qtBin;$opencvBin;$env:PATH"
 
-    & $exePath
+    $runArgs = @()
+    if ($Demo) {
+        $runArgs += "--demo"
+    }
+
+    & $exePath @runArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Application exited with code $LASTEXITCODE"
     }
