@@ -18,6 +18,9 @@
 - Bind address and port can now be changed from the control panel, and applying them triggers a receiver-side UDP socket rebind without restarting the whole application.
 - The UI now exposes an explicit AI detection toggle and status area, but inference remains opt-in and idle until a real model/runtime path is configured.
 - The VS Code build flow now deploys Qt, OpenCV, and MinGW runtime DLLs into the executable folder, and `build-vscode/debug/newudp.exe` can launch directly without external PATH setup.
+- The right-side page switcher no longer uses scrollable tabs; it now uses a compact multi-row button grid to keep all sections visible within the narrower control panel.
+- Presentation is now decoupled from frame parsing with a fixed refresh cadence, and the UI debug stats now show both parse FPS and present FPS.
+- A portable package and zip are now produced under `dist/`, and the packaged `newudp.exe` has passed a direct launch smoke test.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
@@ -34,7 +37,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate the new paged control workflow interactively, then continue receiver-side performance optimization and decide how the AI page should connect to a real model/runtime path.
+- Validate real-hardware smoothness with the new parse/present split, then continue reducing residual startup stutter and decide how the AI page should connect to a real model/runtime path.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.
@@ -46,6 +49,7 @@
 - The build now depends on a project-local toolchain path inside this repository, so moving the repository will require refreshing the environment variables or relying on the detection script.
 - Recording behavior has compile-time and startup smoke coverage now, but it still needs a manual output-file validation pass.
 - Runtime network rebinding is now available, but it still needs hardware-path validation on the actual UDP source to confirm it behaves correctly under real traffic.
+- The portable package path is now working on this machine, but it still needs verification on a second Windows machine to confirm no hidden local dependency remains.
 
 ## Handoff Notes
 - Start each new session by reading `PROJECT_BRIEF.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `TASKS.md`, and `STATE.md`.

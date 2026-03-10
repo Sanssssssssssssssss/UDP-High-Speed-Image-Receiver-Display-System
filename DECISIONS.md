@@ -131,3 +131,15 @@
 - Date: 2026-03-10
 - Decision: the VS Code build flow shall run `windeployqt` and copy the required OpenCV and MinGW runtime DLLs into the executable output directory so `newudp.exe` can be launched directly.
 - Reason: direct launches were failing with missing Qt/OpenCV runtime libraries even though the project built successfully.
+
+## D-023 Keep all control pages visible through a compact multi-row switcher
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: replace scrollable page tabs with a compact multi-row page button layout so all right-side sections remain directly visible within the control panel width.
+- Reason: the scrollable tab strip was wasting width and hiding sections behind navigation arrows, which made the control workflow feel broken.
+
+## D-024 Decouple parsing throughput from presentation cadence
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: frame parsing may run as fast as data arrives, but screen presentation is driven by a fixed refresh cadence and reported separately as present FPS.
+- Reason: the previous "update on every completed frame" path could report high FPS while still looking visually stuttery because parsing and painting were not paced independently.

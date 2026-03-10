@@ -6,11 +6,12 @@
 #include <QElapsedTimer>
 #include <QLabel>
 #include <QLineEdit>
+#include <QList>
 #include <QPushButton>
+#include <QGridLayout>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStackedWidget>
-#include <QTabBar>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -58,6 +59,7 @@ private:
     QWidget *createCapturePage();
     QWidget *createNetworkPage();
     QWidget *createAiPage();
+    QPushButton *createPageButton(const QString &text, int pageIndex);
     void addSliderControl(QVBoxLayout *parentLayout,
                           const QString &labelText,
                           QLabel **valueLabelOut,
@@ -66,11 +68,13 @@ private:
                           int maxValue,
                           int defaultValue,
                           const char *slot);
+    void setCurrentPage(int pageIndex);
 
     QLabel *fpsLabel;
     QLabel *performanceLabel;
 
-    QTabBar *pageTabs;
+    QGridLayout *pageButtonLayout;
+    QList<QPushButton *> pageButtons;
     QStackedWidget *pageStack;
 
     QSlider *brightnessSlider;

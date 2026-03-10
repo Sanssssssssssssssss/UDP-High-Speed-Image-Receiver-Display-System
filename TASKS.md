@@ -14,6 +14,7 @@
 - [ ] Replace remaining hardcoded runtime configuration with receiver-side configurable parameters.
 - [ ] Replace AI placeholder control with a verified model-backed inference path once the runtime/model location is defined.
 - [ ] Benchmark and optimize RGB565 -> RGB888 conversion further with SIMD if LUT is not sufficient.
+- [ ] Investigate residual real-hardware smoothness issues after decoupling parse FPS and present FPS.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -56,6 +57,9 @@
 - [x] Add operator-editable bind address and port controls with receiver-side rebind support.
 - [x] Add an explicit AI control entry and status pane in the UI without forcing inference onto the hot path.
 - [x] Deploy Qt, OpenCV, and MinGW runtime DLLs into the built executable directory so `newudp.exe` can run directly.
+- [x] Replace scrollable page tabs with a compact multi-row page switcher in the right-side control panel.
+- [x] Decouple frame parsing from presentation cadence and expose parse FPS vs present FPS in the debug stats.
+- [x] Produce a portable package directory and zip under `dist/` for running on other Windows machines.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

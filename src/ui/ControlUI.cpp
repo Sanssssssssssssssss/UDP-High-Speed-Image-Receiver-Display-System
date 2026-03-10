@@ -15,6 +15,7 @@ network settings, and AI controls.
 #include "ControlUI.h"
 #include <QFileDialog>
 #include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QMessageBox>
 #include <QStyle>
@@ -41,7 +42,7 @@ ControlUI::ControlUI(QWidget *parent)
     : QWidget(parent),
       fpsLabel(nullptr),
       performanceLabel(nullptr),
-      pageTabs(nullptr),
+      pageButtonLayout(nullptr),
       pageStack(nullptr),
       brightnessSlider(nullptr),
       brightnessValueLabel(nullptr),
@@ -233,26 +234,32 @@ ControlUI::ControlUI(QWidget *parent)
             border: 1px solid #303036;
             selection-background-color: #2a2a30;
         }
-        QTabBar::tab {
-            min-width: 86px;
-            min-height: 42px;
-            padding: 8px 16px;
-            margin-right: 8px;
+        QPushButton#PageButton {
+            min-height: 46px;
             border-radius: 14px;
             background: #121214;
             color: #9f9fa7;
             border: 1px solid #26262a;
             font-size: 14px;
             font-weight: 700;
+            text-align: center;
         }
-        QTabBar::tab:selected {
+        QPushButton#PageButton:hover {
+            background: #1b1b1f;
+            color: #f1f1f3;
+        }
+        QPushButton#PageButton[active="true"] {
             background: #f1f1f3;
             color: #111113;
             border-color: #f1f1f3;
         }
-        QTabBar::tab:hover:!selected {
-            background: #1b1b1f;
-            color: #f1f1f3;
+        QPushButton#PageButton[active="true"]:hover {
+            background: #ffffff;
+            color: #111113;
+        }
+        QWidget#PageSwitchBar {
+            border-radius: 14px;
+            background: transparent;
         }
     )");
 
@@ -302,15 +309,17 @@ ControlUI::ControlUI(QWidget *parent)
     pageCardLayout->setContentsMargins(18, 18, 18, 18);
     pageCardLayout->setSpacing(16);
 
-    pageTabs = new QTabBar(pageCard);
-    pageTabs->addTab("Image");
-    pageTabs->addTab("Capture");
-    pageTabs->addTab("Network");
-    pageTabs->addTab("AI");
-    pageTabs->setExpanding(true);
-    pageTabs->setDrawBase(false);
-    pageTabs->setCurrentIndex(0);
-    pageCardLayout->addWidget(pageTabs);
+    auto *pageButtonBar = new QWidget(pageCard);
+    pageButtonBar->setObjectName("PageSwitchBar");
+    pageButtonLayout = new QGridLayout(pageButtonBar);
+    pageButtonLayout->setContentsMargins(0, 0, 0, 0);
+    pageButtonLayout->setHorizontalSpacing(10);
+    pageButtonLayout->setVerticalSpacing(10);
+    pageButtonLayout->addWidget(createPageButton("Image", 0), 0, 0);
+    pageButtonLayout->addWidget(createPageButton("Capture", 1), 0, 1);
+    pageButtonLayout->addWidget(createPageButton("Network", 2), 1, 0);
+    pageButtonLayout->addWidget(createPageButton("AI", 3), 1, 1);
+    pageCardLayout->addWidget(pageButtonBar);
 
     pageStack = new QStackedWidget(pageCard);
     pageStack->addWidget(createImagePage());
@@ -319,9 +328,8 @@ ControlUI::ControlUI(QWidget *parent)
     pageStack->addWidget(createAiPage());
     pageCardLayout->addWidget(pageStack, 1);
 
-    connect(pageTabs, &QTabBar::currentChanged, pageStack, &QStackedWidget::setCurrentIndex);
-
     layout->addWidget(pageCard, 1);
+    setCurrentPage(0);
 }
 
 QWidget *ControlUI::createImagePage() {
@@ -358,6 +366,16 @@ QWidget *ControlUI::createImagePage() {
     layout->addWidget(geometryCard);
     layout->addStretch(1);
     return page;
+}
+
+QPushButton *ControlUI::createPageButton(const QString &text, int pageIndex) {
+    auto *button = new QPushButton(text, this);
+    button->setObjectName("PageButton");
+    button->setCheckable(false);
+    button->setProperty("active", false);
+    connect(button, &QPushButton::clicked, this, [this, pageIndex]() { setCurrentPage(pageIndex); });
+    pageButtons.append(button);
+    return button;
 }
 
 QWidget *ControlUI::createCapturePage() {
@@ -521,6 +539,18 @@ void ControlUI::addSliderControl(QVBoxLayout *parentLayout,
     parentLayout->addWidget(rowContainer);
     *valueLabelOut = valueLabel;
     *sliderOut = slider;
+}
+
+void ControlUI::setCurrentPage(int pageIndex) {
+    pageStack->setCurrentIndex(pageIndex);
+
+    for (int i = 0; i < pageButtons.size(); ++i) {
+        QPushButton *button = pageButtons[i];
+        button->setProperty("active", i == pageIndex);
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+        button->update();
+    }
 }
 
 void ControlUI::onFPSChanged(int fps) {

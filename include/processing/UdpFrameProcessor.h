@@ -55,6 +55,7 @@ private slots:
     void enqueueFrameBatch(const QList<QByteArray> &batch);
     void drainPendingBatches();
     void onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message);
+    void presentLatestFrame();
 
 private:
     static bool isMarkerPacket(const QByteArray &data, char marker);
@@ -71,7 +72,9 @@ private:
     QMutex imageMutex;
 
     QTimer *fpsTimer;
+    QTimer *presentTimer;
     int frameCount;
+    int presentedFrameCount;
     quint64 datagramsThisSecond;
     quint64 completedFramesThisSecond;
     quint64 recoveredLinesThisSecond;
@@ -112,6 +115,7 @@ private:
     bool aiDetectionEnabled;
     cv::VideoWriter videoWriter;
     bool isRecording;
+    bool framePendingPresentation;
 };
 
 #endif // UDP_FRAME_PROCESSOR_H

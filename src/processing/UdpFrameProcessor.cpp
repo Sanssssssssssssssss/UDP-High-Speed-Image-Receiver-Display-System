@@ -36,7 +36,9 @@ const std::array<uchar, 64> kExpand6To8 = []() {
 
 UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
     : QWidget(parent),
+      presentTimer(nullptr),
       frameCount(0),
+      presentedFrameCount(0),
       datagramsThisSecond(0),
       completedFramesThisSecond(0),
       recoveredLinesThisSecond(0),
@@ -71,7 +73,8 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
       receiverAddress("0.0.0.0"),
       receiverPort(8080),
       aiDetectionEnabled(false),
-      isRecording(false) {
+      isRecording(false),
+      framePendingPresentation(false) {
     rawImage = QImage(kFrameWidth, kFrameHeight, QImage::Format_RGB888);
     rawImage.fill(Qt::black);
     displayImage = rawImage.copy();
@@ -82,6 +85,11 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
     fpsTimer = new QTimer(this);
     connect(fpsTimer, &QTimer::timeout, this, &UdpFrameProcessor::updateFPS);
     fpsTimer->start(1000);
+
+    presentTimer = new QTimer(this);
+    presentTimer->setTimerType(Qt::PreciseTimer);
+    connect(presentTimer, &QTimer::timeout, this, &UdpFrameProcessor::presentLatestFrame);
+    presentTimer->start(16);
 
     receiver = new UdpReceiver();
     receiverThread = new QThread();
@@ -162,16 +170,16 @@ void UdpFrameProcessor::applyProcessing(const cv::Mat &sourceRgb, cv::Mat &destR
 }
 
 void UdpFrameProcessor::refreshDisplayImage() {
+    if (brightnessValue == 50 && gammaValue == 0 && sharpnessValue == 0 && denoiseValue == 0) {
+        QMutexLocker lock(&imageMutex);
+        displayImage = rawImage;
+        return;
+    }
+
     QImage rawCopy;
     {
         QMutexLocker lock(&imageMutex);
         rawCopy = rawImage.copy();
-    }
-
-    if (brightnessValue == 50 && gammaValue == 0 && sharpnessValue == 0 && denoiseValue == 0) {
-        QMutexLocker lock(&imageMutex);
-        displayImage = rawCopy;
-        return;
     }
 
     cv::Mat sourceRgb(rawCopy.height(), rawCopy.width(), CV_8UC3, rawCopy.bits(), rawCopy.bytesPerLine());
@@ -202,13 +210,19 @@ void UdpFrameProcessor::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QImage frameToDraw;
+    const bool mirrorHorizontal = flipHorizontal;
+    const bool mirrorVertical = flipVertical;
     {
         QMutexLocker lock(&imageMutex);
-        frameToDraw = buildOutputFrame(displayImage);
+        frameToDraw = displayImage;
     }
 
     if (frameToDraw.isNull()) {
         return;
+    }
+
+    if (mirrorHorizontal || mirrorVertical) {
+        frameToDraw = frameToDraw.mirrored(mirrorHorizontal, mirrorVertical);
     }
 
     QPainter painter(this);
@@ -221,7 +235,7 @@ void UdpFrameProcessor::paintEvent(QPaintEvent *event) {
 }
 
 void UdpFrameProcessor::updateFPS() {
-    emit fpsChanged(frameCount);
+    emit fpsChanged(presentedFrameCount);
 
     const double avgFrameMs = completedFramesThisSecond > 0
         ? static_cast<double>(frameProcessingNsThisSecond) / static_cast<double>(completedFramesThisSecond) / 1000000.0
@@ -229,8 +243,10 @@ void UdpFrameProcessor::updateFPS() {
     const double avgInterpolationMs = completedFramesThisSecond > 0
         ? static_cast<double>(interpolationNsThisSecond) / static_cast<double>(completedFramesThisSecond) / 1000000.0
         : 0.0;
-    const QString statsText = QString("Perf: pkts/s=%1 | frame=%2 ms | interp=%3 ms | recovered lines/s=%4\nmarkers start/end=%5/%6 | start-no-end=%7 | end-no-start=%8 | orphan=%9 | overflow=%10 | short-end=%11 | resync=%12\nqueue dropped pkts/s=%13 | queue max=%14/%15")
+    const QString finalStatsText = QString("Perf: pkts/s=%1 | parse fps=%2 | present fps=%3 | frame=%4 ms | interp=%5 ms | recovered lines/s=%6\nmarkers start/end=%7/%8 | start-no-end=%9 | end-no-start=%10 | orphan=%11 | overflow=%12 | short-end=%13 | resync=%14\nqueue dropped pkts/s=%15 | queue max=%16/%17")
                                   .arg(datagramsThisSecond)
+                                  .arg(frameCount)
+                                  .arg(presentedFrameCount)
                                   .arg(avgFrameMs, 0, 'f', 3)
                                   .arg(avgInterpolationMs, 0, 'f', 3)
                                   .arg(recoveredLinesThisSecond)
@@ -245,9 +261,10 @@ void UdpFrameProcessor::updateFPS() {
                                   .arg(droppedPacketsThisSecond)
                                   .arg(maxQueuedPacketsThisSecond)
                                   .arg(kMaxQueuedPackets);
-    emit performanceStatsChanged(statsText);
+    emit performanceStatsChanged(finalStatsText);
 
     frameCount = 0;
+    presentedFrameCount = 0;
     datagramsThisSecond = 0;
     completedFramesThisSecond = 0;
     recoveredLinesThisSecond = 0;
@@ -264,6 +281,16 @@ void UdpFrameProcessor::updateFPS() {
     overflowLinePacketsThisSecond = 0;
     shortFrameEndsThisSecond = 0;
     parserResyncEventsThisSecond = 0;
+}
+
+void UdpFrameProcessor::presentLatestFrame() {
+    if (!framePendingPresentation) {
+        return;
+    }
+
+    framePendingPresentation = false;
+    ++presentedFrameCount;
+    update();
 }
 
 void UdpFrameProcessor::resetParserState() {
@@ -459,7 +486,7 @@ void UdpFrameProcessor::finalizeFrame() {
     ++frameCount;
     ++completedFramesThisSecond;
     frameProcessingNsThisSecond += static_cast<quint64>(frameTimer.nsecsElapsed());
-    update();
+    framePendingPresentation = true;
 
     if (isRecording && videoWriter.isOpened()) {
         writeFrameToVideo();
@@ -605,7 +632,7 @@ QImage UdpFrameProcessor::buildOutputFrame(const QImage &sourceFrame) const {
     }
 
     if (!flipHorizontal && !flipVertical) {
-        return sourceFrame.copy();
+        return sourceFrame;
     }
 
     return sourceFrame.mirrored(flipHorizontal, flipVertical);

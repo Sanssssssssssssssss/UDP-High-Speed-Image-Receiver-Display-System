@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Diagnose", "Build", "Run")]
+    [ValidateSet("Diagnose", "Build", "Run", "Package")]
     [string]$Action = "Diagnose",
     [string]$BuildDir = "build-vscode",
     [switch]$Demo
@@ -13,6 +13,7 @@ $snapshotPath = Join-Path $workspace ".vscode\\toolchain.snapshot.json"
 $projectFile = Join-Path $workspace "newudp.pro"
 $buildPath = Join-Path $workspace $BuildDir
 $exePath = [System.IO.Path]::Combine($buildPath, "debug", "newudp.exe")
+$distRoot = Join-Path $workspace "dist"
 
 function Resolve-FirstExistingPath {
     param([string[]]$Candidates)
@@ -258,8 +259,62 @@ function Invoke-Run {
     }
 }
 
+function Invoke-Package {
+    $toolchain = Resolve-Toolchain
+
+    if (-not (Test-Path $exePath)) {
+        Invoke-Build
+        $toolchain = Resolve-Toolchain
+    }
+
+    $packageName = "Post-Train-UDP-Vision-Console"
+    $packageDir = Join-Path $distRoot $packageName
+    $zipPath = Join-Path $distRoot "$packageName.zip"
+    $exeDir = Split-Path -Parent $toolchain.ExePath
+
+    if (Test-Path $packageDir) {
+        Remove-Item -Recurse -Force $packageDir
+    }
+    New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+
+    Copy-Item -Force (Join-Path $exeDir "newudp.exe") $packageDir
+    Get-ChildItem -Path $exeDir -Filter *.dll | ForEach-Object {
+        Copy-Item -Force $_.FullName $packageDir
+    }
+
+    @("bearer", "iconengines", "imageformats", "platforms", "styles") | ForEach-Object {
+        $pluginDir = Join-Path $exeDir $_
+        if (Test-Path $pluginDir) {
+            Copy-Item -Recurse -Force $pluginDir $packageDir
+        }
+    }
+
+    $readme = @"
+Post-Train UDP Vision Console
+
+Run:
+  newudp.exe
+
+Demo mode:
+  newudp.exe --demo
+
+This package already includes the required Qt, OpenCV, and MinGW runtime DLLs.
+"@
+    Set-Content -Path (Join-Path $packageDir "README.txt") -Value $readme -Encoding ASCII
+
+    if (Test-Path $zipPath) {
+        Remove-Item -Force $zipPath
+    }
+
+    Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath
+
+    Write-Host "PackageDir  : $packageDir"
+    Write-Host "PackageZip  : $zipPath"
+}
+
 switch ($Action) {
     "Diagnose" { Invoke-Diagnose }
     "Build" { Invoke-Build }
     "Run" { Invoke-Run }
+    "Package" { Invoke-Package }
 }
