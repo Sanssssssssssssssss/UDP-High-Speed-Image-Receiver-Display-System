@@ -172,9 +172,66 @@ function Invoke-Build {
         if ($LASTEXITCODE -ne 0) {
             throw "mingw32-make failed with exit code $LASTEXITCODE"
         }
+
+        Invoke-DeployRuntime -Toolchain $toolchain
     }
     finally {
         Pop-Location
+    }
+}
+
+function Copy-IfExists {
+    param(
+        [string]$Source,
+        [string]$Destination
+    )
+
+    if (Test-Path $Source) {
+        Copy-Item -Force $Source $Destination
+    }
+}
+
+function Invoke-DeployRuntime {
+    param($Toolchain)
+
+    $exeDir = Split-Path -Parent $Toolchain.ExePath
+    $qtBin = Split-Path -Parent $Toolchain.QMake
+    $mingwBin = Split-Path -Parent $Toolchain.MingwMake
+    $opencvBin = Join-Path $Toolchain.OpenCVRoot "x64\\mingw\\bin"
+    $windeployqt = Join-Path $qtBin "windeployqt.exe"
+
+    if (-not (Test-Path $Toolchain.ExePath)) {
+        throw "Cannot deploy runtime because executable was not built: $($Toolchain.ExePath)"
+    }
+
+    if (Test-Path $windeployqt) {
+        & $windeployqt --debug --no-compiler-runtime --no-translations $Toolchain.ExePath
+        if ($LASTEXITCODE -ne 0) {
+            throw "windeployqt failed with exit code $LASTEXITCODE"
+        }
+    }
+
+    $opencvDlls = @(
+        "libopencv_core348.dll",
+        "libopencv_imgproc348.dll",
+        "libopencv_highgui348.dll",
+        "libopencv_imgcodecs348.dll",
+        "libopencv_videoio348.dll",
+        "opencv_ffmpeg348_64.dll"
+    )
+
+    foreach ($dll in $opencvDlls) {
+        Copy-IfExists -Source (Join-Path $opencvBin $dll) -Destination $exeDir
+    }
+
+    $mingwDlls = @(
+        "libgcc_s_seh-1.dll",
+        "libstdc++-6.dll",
+        "libwinpthread-1.dll"
+    )
+
+    foreach ($dll in $mingwDlls) {
+        Copy-IfExists -Source (Join-Path $mingwBin $dll) -Destination $exeDir
     }
 }
 

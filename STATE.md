@@ -17,6 +17,7 @@
 - The right-side control area now keeps stream status pinned while image tuning, capture, network, and AI controls live in switchable subpages instead of one long scrolling column.
 - Bind address and port can now be changed from the control panel, and applying them triggers a receiver-side UDP socket rebind without restarting the whole application.
 - The UI now exposes an explicit AI detection toggle and status area, but inference remains opt-in and idle until a real model/runtime path is configured.
+- The VS Code build flow now deploys Qt, OpenCV, and MinGW runtime DLLs into the executable folder, and `build-vscode/debug/newudp.exe` can launch directly without external PATH setup.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.

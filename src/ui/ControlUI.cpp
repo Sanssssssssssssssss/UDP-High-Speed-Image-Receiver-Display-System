@@ -41,7 +41,7 @@ ControlUI::ControlUI(QWidget *parent)
     : QWidget(parent),
       fpsLabel(nullptr),
       performanceLabel(nullptr),
-      pageList(nullptr),
+      pageTabs(nullptr),
       pageStack(nullptr),
       brightnessSlider(nullptr),
       brightnessValueLabel(nullptr),
@@ -233,27 +233,24 @@ ControlUI::ControlUI(QWidget *parent)
             border: 1px solid #303036;
             selection-background-color: #2a2a30;
         }
-        QListWidget {
-            background: #111113;
-            border: 1px solid #26262a;
-            border-radius: 18px;
-            padding: 8px;
-            color: #a9a9b0;
-            outline: none;
-        }
-        QListWidget::item {
-            min-height: 54px;
-            padding: 12px 14px;
+        QTabBar::tab {
+            min-width: 86px;
+            min-height: 42px;
+            padding: 8px 16px;
+            margin-right: 8px;
             border-radius: 14px;
-            margin-bottom: 6px;
-            font-size: 15px;
+            background: #121214;
+            color: #9f9fa7;
+            border: 1px solid #26262a;
+            font-size: 14px;
             font-weight: 700;
         }
-        QListWidget::item:selected {
+        QTabBar::tab:selected {
             background: #f1f1f3;
             color: #111113;
+            border-color: #f1f1f3;
         }
-        QListWidget::item:hover:!selected {
+        QTabBar::tab:hover:!selected {
             background: #1b1b1f;
             color: #f1f1f3;
         }
@@ -301,18 +298,19 @@ ControlUI::ControlUI(QWidget *parent)
 
     auto *pageCard = new QFrame(this);
     pageCard->setObjectName("Card");
-    auto *pageCardLayout = new QHBoxLayout(pageCard);
+    auto *pageCardLayout = new QVBoxLayout(pageCard);
     pageCardLayout->setContentsMargins(18, 18, 18, 18);
     pageCardLayout->setSpacing(16);
 
-    pageList = new QListWidget(pageCard);
-    pageList->setFixedWidth(136);
-    pageList->addItem("Image");
-    pageList->addItem("Capture");
-    pageList->addItem("Network");
-    pageList->addItem("AI");
-    pageList->setCurrentRow(0);
-    pageCardLayout->addWidget(pageList);
+    pageTabs = new QTabBar(pageCard);
+    pageTabs->addTab("Image");
+    pageTabs->addTab("Capture");
+    pageTabs->addTab("Network");
+    pageTabs->addTab("AI");
+    pageTabs->setExpanding(true);
+    pageTabs->setDrawBase(false);
+    pageTabs->setCurrentIndex(0);
+    pageCardLayout->addWidget(pageTabs);
 
     pageStack = new QStackedWidget(pageCard);
     pageStack->addWidget(createImagePage());
@@ -321,7 +319,7 @@ ControlUI::ControlUI(QWidget *parent)
     pageStack->addWidget(createAiPage());
     pageCardLayout->addWidget(pageStack, 1);
 
-    connect(pageList, &QListWidget::currentRowChanged, pageStack, &QStackedWidget::setCurrentIndex);
+    connect(pageTabs, &QTabBar::currentChanged, pageStack, &QStackedWidget::setCurrentIndex);
 
     layout->addWidget(pageCard, 1);
 }
@@ -330,12 +328,15 @@ QWidget *ControlUI::createImagePage() {
     auto *page = new QWidget(this);
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(16);
+    layout->setSpacing(14);
 
-    addSliderControl(layout, "Brightness", &brightnessValueLabel, &brightnessSlider, 0, 100, 50, SLOT(onBrightnessChanged(int)));
-    addSliderControl(layout, "Gamma", &gammaValueLabel, &gammaSlider, -100, 100, 0, SLOT(onGammaChanged(int)));
-    addSliderControl(layout, "Sharpness", &sharpnessValueLabel, &sharpnessSlider, 0, 100, 0, SLOT(onSharpnessChanged(int)));
-    addSliderControl(layout, "Denoise", &denoiseValueLabel, &denoiseSlider, 0, 100, 0, SLOT(onDenoiseChanged(int)));
+    auto *tuningCard = createCard(page, "Image Tuning");
+    auto *tuningLayout = qobject_cast<QVBoxLayout *>(tuningCard->layout());
+    addSliderControl(tuningLayout, "Brightness", &brightnessValueLabel, &brightnessSlider, 0, 100, 50, SLOT(onBrightnessChanged(int)));
+    addSliderControl(tuningLayout, "Gamma", &gammaValueLabel, &gammaSlider, -100, 100, 0, SLOT(onGammaChanged(int)));
+    addSliderControl(tuningLayout, "Sharpness", &sharpnessValueLabel, &sharpnessSlider, 0, 100, 0, SLOT(onSharpnessChanged(int)));
+    addSliderControl(tuningLayout, "Denoise", &denoiseValueLabel, &denoiseSlider, 0, 100, 0, SLOT(onDenoiseChanged(int)));
+    layout->addWidget(tuningCard);
 
     auto *geometryCard = createCard(page, "Orientation");
     auto *geometryLayout = qobject_cast<QVBoxLayout *>(geometryCard->layout());
@@ -365,41 +366,45 @@ QWidget *ControlUI::createCapturePage() {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(16);
 
-    browseButton = new QPushButton("Choose Save Directory", page);
+    auto *captureCard = createCard(page, "Capture Output");
+    auto *captureLayout = qobject_cast<QVBoxLayout *>(captureCard->layout());
+
+    browseButton = new QPushButton("Choose Save Directory", captureCard);
     browseButton->setObjectName("SecondaryButton");
     connect(browseButton, &QPushButton::clicked, this, &ControlUI::onBrowseSaveDirectory);
-    layout->addWidget(browseButton);
+    captureLayout->addWidget(browseButton);
 
-    saveDirectoryLabel = new QLabel("Save Directory: Not Selected", page);
+    saveDirectoryLabel = new QLabel("Save Directory: Not Selected", captureCard);
     saveDirectoryLabel->setObjectName("DirLabel");
     saveDirectoryLabel->setWordWrap(true);
-    layout->addWidget(saveDirectoryLabel);
+    captureLayout->addWidget(saveDirectoryLabel);
 
-    auto *formatLabel = new QLabel("Video Format", page);
+    auto *formatLabel = new QLabel("Video Format", captureCard);
     formatLabel->setObjectName("ControlLabel");
-    layout->addWidget(formatLabel);
+    captureLayout->addWidget(formatLabel);
 
-    formatComboBox = new QComboBox(page);
+    formatComboBox = new QComboBox(captureCard);
     formatComboBox->addItem("mp4");
     formatComboBox->addItem("avi");
-    layout->addWidget(formatComboBox);
+    captureLayout->addWidget(formatComboBox);
 
-    snapshotButton = new QPushButton("Take Snapshot", page);
+    snapshotButton = new QPushButton("Take Snapshot", captureCard);
     snapshotButton->setObjectName("PrimaryButton");
     connect(snapshotButton, &QPushButton::clicked, this, &ControlUI::onTakeSnapshot);
-    layout->addWidget(snapshotButton);
+    captureLayout->addWidget(snapshotButton);
 
-    recordButton = new QPushButton("Start Recording", page);
+    recordButton = new QPushButton("Start Recording", captureCard);
     recordButton->setObjectName("RecordButton");
     recordButton->setProperty("recording", false);
     connect(recordButton, &QPushButton::clicked, this, &ControlUI::onRecordVideo);
-    layout->addWidget(recordButton);
+    captureLayout->addWidget(recordButton);
 
-    auto *hint = new QLabel("Recording uses the processed display frame, including local image tuning and flip state.", page);
+    auto *hint = new QLabel("Recording uses the processed display frame, including local image tuning and flip state.", captureCard);
     hint->setObjectName("HintLabel");
     hint->setWordWrap(true);
-    layout->addWidget(hint);
+    captureLayout->addWidget(hint);
 
+    layout->addWidget(captureCard);
     layout->addStretch(1);
     return page;
 }
@@ -410,38 +415,42 @@ QWidget *ControlUI::createNetworkPage() {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(14);
 
-    auto *addressLabel = new QLabel("Bind Address", page);
+    auto *networkCard = createCard(page, "Receiver Endpoint");
+    auto *networkLayout = qobject_cast<QVBoxLayout *>(networkCard->layout());
+
+    auto *addressLabel = new QLabel("Bind Address", networkCard);
     addressLabel->setObjectName("ControlLabel");
-    layout->addWidget(addressLabel);
+    networkLayout->addWidget(addressLabel);
 
-    addressEdit = new QLineEdit("0.0.0.0", page);
+    addressEdit = new QLineEdit("0.0.0.0", networkCard);
     addressEdit->setPlaceholderText("0.0.0.0");
-    layout->addWidget(addressEdit);
+    networkLayout->addWidget(addressEdit);
 
-    auto *portLabel = new QLabel("Bind Port", page);
+    auto *portLabel = new QLabel("Bind Port", networkCard);
     portLabel->setObjectName("ControlLabel");
-    layout->addWidget(portLabel);
+    networkLayout->addWidget(portLabel);
 
-    portSpinBox = new QSpinBox(page);
+    portSpinBox = new QSpinBox(networkCard);
     portSpinBox->setRange(1, 65535);
     portSpinBox->setValue(8080);
-    layout->addWidget(portSpinBox);
+    networkLayout->addWidget(portSpinBox);
 
-    applyReceiverButton = new QPushButton("Apply And Rebind", page);
+    applyReceiverButton = new QPushButton("Apply And Rebind", networkCard);
     applyReceiverButton->setObjectName("PrimaryButton");
     connect(applyReceiverButton, &QPushButton::clicked, this, &ControlUI::onApplyReceiverSettings);
-    layout->addWidget(applyReceiverButton);
+    networkLayout->addWidget(applyReceiverButton);
 
-    receiverStatusLabel = new QLabel("Receiver: waiting for bind status", page);
+    receiverStatusLabel = new QLabel("Receiver: waiting for bind status", networkCard);
     receiverStatusLabel->setObjectName("StatusText");
     receiverStatusLabel->setWordWrap(true);
-    layout->addWidget(receiverStatusLabel);
+    networkLayout->addWidget(receiverStatusLabel);
 
-    auto *networkHint = new QLabel("Applying settings clears pending receiver-side data and rebinds the UDP socket without restarting the whole app.", page);
+    auto *networkHint = new QLabel("Applying settings clears pending receiver-side data and rebinds the UDP socket without restarting the whole app.", networkCard);
     networkHint->setObjectName("HintLabel");
     networkHint->setWordWrap(true);
-    layout->addWidget(networkHint);
+    networkLayout->addWidget(networkHint);
 
+    layout->addWidget(networkCard);
     layout->addStretch(1);
     return page;
 }
@@ -452,20 +461,24 @@ QWidget *ControlUI::createAiPage() {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(14);
 
-    aiEnableCheckBox = new QCheckBox("Enable AI Detection", page);
-    connect(aiEnableCheckBox, &QCheckBox::toggled, this, &ControlUI::onAiDetectionChanged);
-    layout->addWidget(aiEnableCheckBox);
+    auto *aiCard = createCard(page, "AI Detection");
+    auto *aiLayout = qobject_cast<QVBoxLayout *>(aiCard->layout());
 
-    aiStatusLabel = new QLabel("AI detection is disabled.", page);
+    aiEnableCheckBox = new QCheckBox("Enable AI Detection", aiCard);
+    connect(aiEnableCheckBox, &QCheckBox::toggled, this, &ControlUI::onAiDetectionChanged);
+    aiLayout->addWidget(aiEnableCheckBox);
+
+    aiStatusLabel = new QLabel("AI detection is disabled.", aiCard);
     aiStatusLabel->setObjectName("StatusText");
     aiStatusLabel->setWordWrap(true);
-    layout->addWidget(aiStatusLabel);
+    aiLayout->addWidget(aiStatusLabel);
 
-    auto *aiHint = new QLabel("This page manages the AI path separately so inference can stay explicitly opt-in and isolated from the receive hot path.", page);
+    auto *aiHint = new QLabel("This page manages the AI path separately so inference can stay explicitly opt-in and isolated from the receive hot path.", aiCard);
     aiHint->setObjectName("HintLabel");
     aiHint->setWordWrap(true);
-    layout->addWidget(aiHint);
+    aiLayout->addWidget(aiHint);
 
+    layout->addWidget(aiCard);
     layout->addStretch(1);
     return page;
 }

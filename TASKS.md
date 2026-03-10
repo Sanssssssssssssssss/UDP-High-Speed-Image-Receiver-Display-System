@@ -55,6 +55,7 @@
 - [x] Split the right-side control surface into status + paged subviews for image, capture, network, and AI controls.
 - [x] Add operator-editable bind address and port controls with receiver-side rebind support.
 - [x] Add an explicit AI control entry and status pane in the UI without forcing inference onto the hot path.
+- [x] Deploy Qt, OpenCV, and MinGW runtime DLLs into the built executable directory so `newudp.exe` can run directly.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

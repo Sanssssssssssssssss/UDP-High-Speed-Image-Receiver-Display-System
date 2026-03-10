@@ -125,3 +125,9 @@
 - Date: 2026-03-10
 - Decision: expose AI detection as a dedicated UI-controlled path with explicit status reporting, but do not let it run implicitly on the receive pipeline until model/runtime availability is confirmed.
 - Reason: the user wants AI control in the UI, but current inference assets are absent and the receive path remains performance-critical.
+
+## D-022 Deploy runtime DLLs into the built output directory
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: the VS Code build flow shall run `windeployqt` and copy the required OpenCV and MinGW runtime DLLs into the executable output directory so `newudp.exe` can be launched directly.
+- Reason: direct launches were failing with missing Qt/OpenCV runtime libraries even though the project built successfully.

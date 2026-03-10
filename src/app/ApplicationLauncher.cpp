@@ -230,7 +230,7 @@ int runApplication(int argc, char *argv[]) {
     mainLayout->addWidget(videoPanel, 1);
 
     ControlUI *controlUI = new ControlUI(&mainWidget);
-    controlUI->setFixedWidth(520);
+    controlUI->setFixedWidth(560);
     mainLayout->addWidget(controlUI);
 
     if (enableDemo) {

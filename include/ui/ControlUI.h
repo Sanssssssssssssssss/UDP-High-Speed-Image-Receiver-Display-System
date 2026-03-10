@@ -6,11 +6,11 @@
 #include <QElapsedTimer>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QTabBar>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -70,7 +70,7 @@ private:
     QLabel *fpsLabel;
     QLabel *performanceLabel;
 
-    QListWidget *pageList;
+    QTabBar *pageTabs;
     QStackedWidget *pageStack;
 
     QSlider *brightnessSlider;
