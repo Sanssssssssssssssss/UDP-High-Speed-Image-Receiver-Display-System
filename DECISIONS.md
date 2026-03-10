@@ -107,3 +107,21 @@
 - Date: 2026-03-10
 - Decision: the application starts in hardware-input mode by default, while the built-in 60 fps stress demo and tshark capture bootstrap are enabled only via explicit flags or environment variables.
 - Reason: always-on synthetic traffic and capture bootstrap add avoidable startup load and interfere with real hardware validation.
+
+## D-019 Keep live status pinned and move secondary controls into paged subviews
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: retain the stream status card as a persistent top-level element, while image tuning, capture, network, and AI controls live in dedicated switchable subpages inside the right-side panel.
+- Reason: the single long control column had become too tall and visually dense, reducing operator usability.
+
+## D-020 Apply bind-address and bind-port changes by receiver-side rebind instead of full app restart
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: changing receiver endpoint settings from the UI clears pending receiver-side data, rebinds the UDP socket in its owning thread, and keeps the rest of the app running.
+- Reason: the user explicitly requested editable port/network parameters with a lightweight refresh behavior, and a receiver-thread rebind is lower risk than restarting the whole GUI.
+
+## D-021 Keep AI detection explicitly opt-in and isolated from the hot path
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: expose AI detection as a dedicated UI-controlled path with explicit status reporting, but do not let it run implicitly on the receive pipeline until model/runtime availability is confirmed.
+- Reason: the user wants AI control in the UI, but current inference assets are absent and the receive path remains performance-critical.

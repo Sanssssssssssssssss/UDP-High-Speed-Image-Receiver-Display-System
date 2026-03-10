@@ -14,6 +14,9 @@
 - Horizontal and vertical flip behavior has been corrected for displayed, captured, and recorded output.
 - Video recording now initializes from the processed display frame instead of the stale raw path.
 - The desktop UI now uses a larger right-side control area, and the control text and interactive widgets have been enlarged further while keeping the current title hierarchy and black non-gradient palette.
+- The right-side control area now keeps stream status pinned while image tuning, capture, network, and AI controls live in switchable subpages instead of one long scrolling column.
+- Bind address and port can now be changed from the control panel, and applying them triggers a receiver-side UDP socket rebind without restarting the whole application.
+- The UI now exposes an explicit AI detection toggle and status area, but inference remains opt-in and idle until a real model/runtime path is configured.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
@@ -30,7 +33,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Do an interactive validation pass for snapshot and recording outputs, then continue receiver-side performance optimization and runtime configuration cleanup.
+- Validate the new paged control workflow interactively, then continue receiver-side performance optimization and decide how the AI page should connect to a real model/runtime path.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.
@@ -41,6 +44,7 @@
 - If the external traffic truly depends on NIC promiscuous/mirror mode rather than normal host-addressed UDP delivery, Qt's normal UDP socket path may still be constrained by system/network configuration.
 - The build now depends on a project-local toolchain path inside this repository, so moving the repository will require refreshing the environment variables or relying on the detection script.
 - Recording behavior has compile-time and startup smoke coverage now, but it still needs a manual output-file validation pass.
+- Runtime network rebinding is now available, but it still needs hardware-path validation on the actual UDP source to confirm it behaves correctly under real traffic.
 
 ## Handoff Notes
 - Start each new session by reading `PROJECT_BRIEF.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `TASKS.md`, and `STATE.md`.

@@ -230,7 +230,7 @@ int runApplication(int argc, char *argv[]) {
     mainLayout->addWidget(videoPanel, 1);
 
     ControlUI *controlUI = new ControlUI(&mainWidget);
-    controlUI->setFixedWidth(450);
+    controlUI->setFixedWidth(520);
     mainLayout->addWidget(controlUI);
 
     if (enableDemo) {
@@ -251,7 +251,15 @@ int runApplication(int argc, char *argv[]) {
                      });
     QObject::connect(controlUI, &ControlUI::flipHorizontalRequested, videoDisplay, &UdpFrameProcessor::setFlipHorizontal, Qt::QueuedConnection);
     QObject::connect(controlUI, &ControlUI::flipVerticalRequested, videoDisplay, &UdpFrameProcessor::setFlipVertical, Qt::QueuedConnection);
+    QObject::connect(controlUI, &ControlUI::receiverSettingsRequested, videoDisplay, &UdpFrameProcessor::applyReceiverSettings, Qt::QueuedConnection);
+    QObject::connect(controlUI, &ControlUI::aiDetectionToggled, videoDisplay, &UdpFrameProcessor::setAiDetectionEnabled, Qt::QueuedConnection);
     QObject::connect(videoDisplay, &UdpFrameProcessor::recordingStateChanged, controlUI, &ControlUI::onRecordingStateChanged);
+    QObject::connect(videoDisplay, &UdpFrameProcessor::receiverStatusChanged, controlUI, &ControlUI::onReceiverStatusChanged);
+    QObject::connect(videoDisplay, &UdpFrameProcessor::receiverSettingsChanged, controlUI, &ControlUI::onReceiverSettingsChanged);
+    QObject::connect(videoDisplay, &UdpFrameProcessor::aiStatusChanged, controlUI, &ControlUI::onAiStatusChanged);
+
+    controlUI->onReceiverSettingsChanged("0.0.0.0", 8080);
+    controlUI->onAiStatusChanged("AI detection is disabled.");
 
     mainWidget.setLayout(mainLayout);
     mainWidget.show();

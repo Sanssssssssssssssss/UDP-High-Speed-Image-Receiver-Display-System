@@ -3,23 +3,69 @@
 Created on: 13-11-2024
 Author: Chang Xu
 File: ControlUI.cpp
-Version: 1.7
+Version: 2.1
 Language: C++ (Qt Framework)
 Description:
 This file implements the ControlUI class, which provides
-a user interface for adjusting video processing parameters.
+a paged control surface for status, image tuning, capture,
+network settings, and AI controls.
 ===================================================
 */
 
 #include "ControlUI.h"
-#include <QDebug>
 #include <QFileDialog>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QMessageBox>
 #include <QStyle>
+#include <QVBoxLayout>
 
-ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), recordingTimer(nullptr) {
+namespace {
+QFrame *createCard(QWidget *parent, const QString &titleText) {
+    auto *card = new QFrame(parent);
+    card->setObjectName("Card");
+
+    auto *layout = new QVBoxLayout(card);
+    layout->setContentsMargins(22, 22, 22, 22);
+    layout->setSpacing(16);
+
+    auto *title = new QLabel(titleText, card);
+    title->setObjectName("CardTitle");
+    layout->addWidget(title);
+
+    return card;
+}
+}
+
+ControlUI::ControlUI(QWidget *parent)
+    : QWidget(parent),
+      fpsLabel(nullptr),
+      performanceLabel(nullptr),
+      pageList(nullptr),
+      pageStack(nullptr),
+      brightnessSlider(nullptr),
+      brightnessValueLabel(nullptr),
+      gammaSlider(nullptr),
+      gammaValueLabel(nullptr),
+      sharpnessSlider(nullptr),
+      sharpnessValueLabel(nullptr),
+      denoiseSlider(nullptr),
+      denoiseValueLabel(nullptr),
+      horizontalFlip(nullptr),
+      verticalFlip(nullptr),
+      snapshotButton(nullptr),
+      recordButton(nullptr),
+      browseButton(nullptr),
+      saveDirectoryLabel(nullptr),
+      formatComboBox(nullptr),
+      addressEdit(nullptr),
+      portSpinBox(nullptr),
+      receiverStatusLabel(nullptr),
+      applyReceiverButton(nullptr),
+      aiEnableCheckBox(nullptr),
+      aiStatusLabel(nullptr),
+      isRecording(false),
+      recordingTimer(nullptr) {
     setObjectName("ControlUI");
     setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(R"(
@@ -43,11 +89,10 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 1px;
-            text-transform: uppercase;
         }
         QLabel#PanelTitle {
             color: #fafafa;
-            font-size: 32px;
+            font-size: 30px;
             font-weight: 700;
         }
         QLabel#PanelSubtitle {
@@ -57,21 +102,22 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
         }
         QLabel#CardTitle {
             color: #f4f4f5;
-            font-size: 20px;
+            font-size: 21px;
             font-weight: 650;
         }
         QLabel#MetricValue {
             color: #ffffff;
-            font-size: 46px;
+            font-size: 48px;
             font-weight: 700;
         }
         QLabel#MetricUnit {
             color: #8a8a92;
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 600;
         }
         QLabel#PerfText,
-        QLabel#DirLabel {
+        QLabel#DirLabel,
+        QLabel#StatusText {
             color: #a5a5ac;
             font-size: 15px;
             line-height: 1.35;
@@ -132,7 +178,7 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
             border-color: #f1f1f3;
         }
         QPushButton {
-            min-height: 56px;
+            min-height: 54px;
             border-radius: 16px;
             border: 1px solid #303036;
             padding: 0 16px;
@@ -147,30 +193,27 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
         QPushButton#PrimaryButton:hover {
             background: #ffffff;
         }
-        QPushButton#SecondaryButton {
-            background: #1d1d20;
-            color: #f1f1f3;
-        }
-        QPushButton#SecondaryButton:hover {
-            background: #232327;
-        }
+        QPushButton#SecondaryButton,
         QPushButton#RecordButton {
             background: #1d1d20;
             color: #f1f1f3;
         }
+        QPushButton#SecondaryButton:hover,
         QPushButton#RecordButton:hover {
             background: #26262b;
         }
-        QPushButton#RecordButton[recording=\"true\"] {
+        QPushButton#RecordButton[recording="true"] {
             background: #d44d3f;
             border-color: #d44d3f;
             color: #ffffff;
         }
-        QPushButton#RecordButton[recording=\"true\"]:hover {
+        QPushButton#RecordButton[recording="true"]:hover {
             background: #e15848;
         }
-        QComboBox {
-            min-height: 52px;
+        QComboBox,
+        QLineEdit,
+        QSpinBox {
+            min-height: 50px;
             border-radius: 14px;
             border: 1px solid #303036;
             padding: 0 14px;
@@ -178,9 +221,11 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
             background: #1a1a1d;
             font-size: 16px;
         }
-        QComboBox::drop-down {
+        QComboBox::drop-down,
+        QSpinBox::down-button,
+        QSpinBox::up-button {
             border: none;
-            width: 32px;
+            width: 28px;
         }
         QComboBox QAbstractItemView {
             background: #161618;
@@ -188,11 +233,35 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
             border: 1px solid #303036;
             selection-background-color: #2a2a30;
         }
+        QListWidget {
+            background: #111113;
+            border: 1px solid #26262a;
+            border-radius: 18px;
+            padding: 8px;
+            color: #a9a9b0;
+            outline: none;
+        }
+        QListWidget::item {
+            min-height: 54px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            margin-bottom: 6px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        QListWidget::item:selected {
+            background: #f1f1f3;
+            color: #111113;
+        }
+        QListWidget::item:hover:!selected {
+            background: #1b1b1f;
+            color: #f1f1f3;
+        }
     )");
 
     auto *layout = new QVBoxLayout(this);
-    layout->setSpacing(20);
-    layout->setContentsMargins(26, 26, 26, 26);
+    layout->setSpacing(18);
+    layout->setContentsMargins(24, 24, 24, 24);
     layout->setAlignment(Qt::AlignTop);
 
     auto *eyebrowLabel = new QLabel("POST-TRAIN CONSOLE", this);
@@ -204,20 +273,13 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
     titleLabel->setWordWrap(true);
     layout->addWidget(titleLabel);
 
-    auto *subtitleLabel = new QLabel("Live tuning, capture control and runtime health for the UDP image path.", this);
+    auto *subtitleLabel = new QLabel("Live status stays pinned here. Tuning, capture, network, and AI controls move into dedicated pages.", this);
     subtitleLabel->setObjectName("PanelSubtitle");
     subtitleLabel->setWordWrap(true);
     layout->addWidget(subtitleLabel);
 
-    auto *statusCard = new QFrame(this);
-    statusCard->setObjectName("Card");
-    auto *statusLayout = new QVBoxLayout(statusCard);
-    statusLayout->setContentsMargins(24, 24, 24, 24);
-    statusLayout->setSpacing(14);
-
-    auto *statusHeader = new QLabel("Stream Status", statusCard);
-    statusHeader->setObjectName("CardTitle");
-    statusLayout->addWidget(statusHeader);
+    auto *statusCard = createCard(this, "Stream Status");
+    auto *statusLayout = qobject_cast<QVBoxLayout *>(statusCard->layout());
 
     auto *fpsRow = new QHBoxLayout();
     fpsRow->setContentsMargins(0, 0, 0, 0);
@@ -226,7 +288,6 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
     fpsLabel->setObjectName("MetricValue");
     auto *fpsUnitLabel = new QLabel("FPS", statusCard);
     fpsUnitLabel->setObjectName("MetricUnit");
-    fpsUnitLabel->setAlignment(Qt::AlignBottom | Qt::AlignLeft);
     fpsRow->addWidget(fpsLabel);
     fpsRow->addWidget(fpsUnitLabel);
     fpsRow->addStretch();
@@ -238,64 +299,47 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
     statusLayout->addWidget(performanceLabel);
     layout->addWidget(statusCard);
 
-    auto *tuningCard = new QFrame(this);
-    tuningCard->setObjectName("Card");
-    auto *tuningLayout = new QVBoxLayout(tuningCard);
-    tuningLayout->setContentsMargins(24, 24, 24, 24);
-    tuningLayout->setSpacing(18);
+    auto *pageCard = new QFrame(this);
+    pageCard->setObjectName("Card");
+    auto *pageCardLayout = new QHBoxLayout(pageCard);
+    pageCardLayout->setContentsMargins(18, 18, 18, 18);
+    pageCardLayout->setSpacing(16);
 
-    auto *tuningHeader = new QLabel("Image Tuning", tuningCard);
-    tuningHeader->setObjectName("CardTitle");
-    tuningLayout->addWidget(tuningHeader);
+    pageList = new QListWidget(pageCard);
+    pageList->setFixedWidth(136);
+    pageList->addItem("Image");
+    pageList->addItem("Capture");
+    pageList->addItem("Network");
+    pageList->addItem("AI");
+    pageList->setCurrentRow(0);
+    pageCardLayout->addWidget(pageList);
 
-    auto addSliderControl = [this, tuningLayout](const QString &labelText, QLabel **valueLabelOut, QSlider **sliderOut, int minValue, int maxValue, int defaultValue, const char *slot) {
-        auto *rowContainer = new QWidget(this);
-        auto *rowLayout = new QVBoxLayout(rowContainer);
-        rowLayout->setContentsMargins(0, 0, 0, 0);
-        rowLayout->setSpacing(8);
+    pageStack = new QStackedWidget(pageCard);
+    pageStack->addWidget(createImagePage());
+    pageStack->addWidget(createCapturePage());
+    pageStack->addWidget(createNetworkPage());
+    pageStack->addWidget(createAiPage());
+    pageCardLayout->addWidget(pageStack, 1);
 
-        auto *headerLayout = new QHBoxLayout();
-        headerLayout->setContentsMargins(0, 0, 0, 0);
+    connect(pageList, &QListWidget::currentRowChanged, pageStack, &QStackedWidget::setCurrentIndex);
 
-        auto *label = new QLabel(labelText, rowContainer);
-        label->setObjectName("ControlLabel");
+    layout->addWidget(pageCard, 1);
+}
 
-        auto *valueLabel = new QLabel(QString::number(defaultValue), rowContainer);
-        valueLabel->setObjectName("ValuePill");
-        valueLabel->setAlignment(Qt::AlignCenter);
-        valueLabel->setMinimumWidth(58);
+QWidget *ControlUI::createImagePage() {
+    auto *page = new QWidget(this);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(16);
 
-        auto *slider = new QSlider(Qt::Horizontal, rowContainer);
-        slider->setRange(minValue, maxValue);
-        slider->setValue(defaultValue);
-        connect(slider, SIGNAL(valueChanged(int)), this, slot);
+    addSliderControl(layout, "Brightness", &brightnessValueLabel, &brightnessSlider, 0, 100, 50, SLOT(onBrightnessChanged(int)));
+    addSliderControl(layout, "Gamma", &gammaValueLabel, &gammaSlider, -100, 100, 0, SLOT(onGammaChanged(int)));
+    addSliderControl(layout, "Sharpness", &sharpnessValueLabel, &sharpnessSlider, 0, 100, 0, SLOT(onSharpnessChanged(int)));
+    addSliderControl(layout, "Denoise", &denoiseValueLabel, &denoiseSlider, 0, 100, 0, SLOT(onDenoiseChanged(int)));
 
-        headerLayout->addWidget(label);
-        headerLayout->addStretch();
-        headerLayout->addWidget(valueLabel);
-        rowLayout->addLayout(headerLayout);
-        rowLayout->addWidget(slider);
-
-        tuningLayout->addWidget(rowContainer);
-        *valueLabelOut = valueLabel;
-        *sliderOut = slider;
-    };
-
-    addSliderControl("Brightness", &brightnessValueLabel, &brightnessSlider, 0, 100, 50, SLOT(onBrightnessChanged(int)));
-    addSliderControl("Gamma", &gammaValueLabel, &gammaSlider, -100, 100, 0, SLOT(onGammaChanged(int)));
-    addSliderControl("Sharpness", &sharpnessValueLabel, &sharpnessSlider, 0, 100, 0, SLOT(onSharpnessChanged(int)));
-    addSliderControl("Denoise", &denoiseValueLabel, &denoiseSlider, 0, 100, 0, SLOT(onDenoiseChanged(int)));
-    layout->addWidget(tuningCard);
-
-    auto *geometryCard = new QFrame(this);
-    geometryCard->setObjectName("Card");
-    auto *geometryLayout = new QVBoxLayout(geometryCard);
-    geometryLayout->setContentsMargins(24, 24, 24, 24);
-    geometryLayout->setSpacing(14);
-
-    auto *geometryHeader = new QLabel("Orientation", geometryCard);
-    geometryHeader->setObjectName("CardTitle");
-    geometryLayout->addWidget(geometryHeader);
+    auto *geometryCard = createCard(page, "Orientation");
+    auto *geometryLayout = qobject_cast<QVBoxLayout *>(geometryCard->layout());
+    geometryLayout->setSpacing(12);
 
     horizontalFlip = new QCheckBox("Mirror Horizontally", geometryCard);
     connect(horizontalFlip, &QCheckBox::toggled, this, &ControlUI::onFlipHorizontalChanged);
@@ -305,55 +349,165 @@ ControlUI::ControlUI(QWidget *parent) : QWidget(parent), isRecording(false), rec
     connect(verticalFlip, &QCheckBox::toggled, this, &ControlUI::onFlipVerticalChanged);
     geometryLayout->addWidget(verticalFlip);
 
-    auto *orientationHint = new QLabel("Applied locally to the displayed, captured and recorded frame.", geometryCard);
+    auto *orientationHint = new QLabel("Applied locally to the displayed, captured, and recorded frame.", geometryCard);
     orientationHint->setObjectName("HintLabel");
     orientationHint->setWordWrap(true);
     geometryLayout->addWidget(orientationHint);
+
     layout->addWidget(geometryCard);
+    layout->addStretch(1);
+    return page;
+}
 
-    auto *captureCard = new QFrame(this);
-    captureCard->setObjectName("Card");
-    auto *captureLayout = new QVBoxLayout(captureCard);
-    captureLayout->setContentsMargins(24, 24, 24, 24);
-    captureLayout->setSpacing(16);
+QWidget *ControlUI::createCapturePage() {
+    auto *page = new QWidget(this);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(16);
 
-    auto *captureHeader = new QLabel("Capture Output", captureCard);
-    captureHeader->setObjectName("CardTitle");
-    captureLayout->addWidget(captureHeader);
-
-    browseButton = new QPushButton("Choose Save Directory", captureCard);
+    browseButton = new QPushButton("Choose Save Directory", page);
     browseButton->setObjectName("SecondaryButton");
     connect(browseButton, &QPushButton::clicked, this, &ControlUI::onBrowseSaveDirectory);
-    captureLayout->addWidget(browseButton);
+    layout->addWidget(browseButton);
 
-    saveDirectoryLabel = new QLabel("Save Directory: Not Selected", captureCard);
+    saveDirectoryLabel = new QLabel("Save Directory: Not Selected", page);
     saveDirectoryLabel->setObjectName("DirLabel");
     saveDirectoryLabel->setWordWrap(true);
-    captureLayout->addWidget(saveDirectoryLabel);
+    layout->addWidget(saveDirectoryLabel);
 
-    auto *formatLabel = new QLabel("Video Format", captureCard);
+    auto *formatLabel = new QLabel("Video Format", page);
     formatLabel->setObjectName("ControlLabel");
-    captureLayout->addWidget(formatLabel);
+    layout->addWidget(formatLabel);
 
-    formatComboBox = new QComboBox(captureCard);
+    formatComboBox = new QComboBox(page);
     formatComboBox->addItem("mp4");
     formatComboBox->addItem("avi");
-    captureLayout->addWidget(formatComboBox);
+    layout->addWidget(formatComboBox);
 
-    snapshotButton = new QPushButton("Take Snapshot", captureCard);
+    snapshotButton = new QPushButton("Take Snapshot", page);
     snapshotButton->setObjectName("PrimaryButton");
     connect(snapshotButton, &QPushButton::clicked, this, &ControlUI::onTakeSnapshot);
-    captureLayout->addWidget(snapshotButton);
+    layout->addWidget(snapshotButton);
 
-    recordButton = new QPushButton("Start Recording", captureCard);
+    recordButton = new QPushButton("Start Recording", page);
     recordButton->setObjectName("RecordButton");
     recordButton->setProperty("recording", false);
     connect(recordButton, &QPushButton::clicked, this, &ControlUI::onRecordVideo);
-    captureLayout->addWidget(recordButton);
-    layout->addWidget(captureCard);
+    layout->addWidget(recordButton);
+
+    auto *hint = new QLabel("Recording uses the processed display frame, including local image tuning and flip state.", page);
+    hint->setObjectName("HintLabel");
+    hint->setWordWrap(true);
+    layout->addWidget(hint);
 
     layout->addStretch(1);
-    setLayout(layout);
+    return page;
+}
+
+QWidget *ControlUI::createNetworkPage() {
+    auto *page = new QWidget(this);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(14);
+
+    auto *addressLabel = new QLabel("Bind Address", page);
+    addressLabel->setObjectName("ControlLabel");
+    layout->addWidget(addressLabel);
+
+    addressEdit = new QLineEdit("0.0.0.0", page);
+    addressEdit->setPlaceholderText("0.0.0.0");
+    layout->addWidget(addressEdit);
+
+    auto *portLabel = new QLabel("Bind Port", page);
+    portLabel->setObjectName("ControlLabel");
+    layout->addWidget(portLabel);
+
+    portSpinBox = new QSpinBox(page);
+    portSpinBox->setRange(1, 65535);
+    portSpinBox->setValue(8080);
+    layout->addWidget(portSpinBox);
+
+    applyReceiverButton = new QPushButton("Apply And Rebind", page);
+    applyReceiverButton->setObjectName("PrimaryButton");
+    connect(applyReceiverButton, &QPushButton::clicked, this, &ControlUI::onApplyReceiverSettings);
+    layout->addWidget(applyReceiverButton);
+
+    receiverStatusLabel = new QLabel("Receiver: waiting for bind status", page);
+    receiverStatusLabel->setObjectName("StatusText");
+    receiverStatusLabel->setWordWrap(true);
+    layout->addWidget(receiverStatusLabel);
+
+    auto *networkHint = new QLabel("Applying settings clears pending receiver-side data and rebinds the UDP socket without restarting the whole app.", page);
+    networkHint->setObjectName("HintLabel");
+    networkHint->setWordWrap(true);
+    layout->addWidget(networkHint);
+
+    layout->addStretch(1);
+    return page;
+}
+
+QWidget *ControlUI::createAiPage() {
+    auto *page = new QWidget(this);
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(14);
+
+    aiEnableCheckBox = new QCheckBox("Enable AI Detection", page);
+    connect(aiEnableCheckBox, &QCheckBox::toggled, this, &ControlUI::onAiDetectionChanged);
+    layout->addWidget(aiEnableCheckBox);
+
+    aiStatusLabel = new QLabel("AI detection is disabled.", page);
+    aiStatusLabel->setObjectName("StatusText");
+    aiStatusLabel->setWordWrap(true);
+    layout->addWidget(aiStatusLabel);
+
+    auto *aiHint = new QLabel("This page manages the AI path separately so inference can stay explicitly opt-in and isolated from the receive hot path.", page);
+    aiHint->setObjectName("HintLabel");
+    aiHint->setWordWrap(true);
+    layout->addWidget(aiHint);
+
+    layout->addStretch(1);
+    return page;
+}
+
+void ControlUI::addSliderControl(QVBoxLayout *parentLayout,
+                                 const QString &labelText,
+                                 QLabel **valueLabelOut,
+                                 QSlider **sliderOut,
+                                 int minValue,
+                                 int maxValue,
+                                 int defaultValue,
+                                 const char *slot) {
+    auto *rowContainer = new QWidget(this);
+    auto *rowLayout = new QVBoxLayout(rowContainer);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->setSpacing(8);
+
+    auto *headerLayout = new QHBoxLayout();
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto *label = new QLabel(labelText, rowContainer);
+    label->setObjectName("ControlLabel");
+
+    auto *valueLabel = new QLabel(QString::number(defaultValue), rowContainer);
+    valueLabel->setObjectName("ValuePill");
+    valueLabel->setAlignment(Qt::AlignCenter);
+    valueLabel->setMinimumWidth(58);
+
+    auto *slider = new QSlider(Qt::Horizontal, rowContainer);
+    slider->setRange(minValue, maxValue);
+    slider->setValue(defaultValue);
+    connect(slider, SIGNAL(valueChanged(int)), this, slot);
+
+    headerLayout->addWidget(label);
+    headerLayout->addStretch();
+    headerLayout->addWidget(valueLabel);
+    rowLayout->addLayout(headerLayout);
+    rowLayout->addWidget(slider);
+
+    parentLayout->addWidget(rowContainer);
+    *valueLabelOut = valueLabel;
+    *sliderOut = slider;
 }
 
 void ControlUI::onFPSChanged(int fps) {
@@ -362,6 +516,19 @@ void ControlUI::onFPSChanged(int fps) {
 
 void ControlUI::onPerformanceStatsChanged(const QString &statsText) {
     performanceLabel->setText(statsText);
+}
+
+void ControlUI::onReceiverStatusChanged(const QString &statusText) {
+    receiverStatusLabel->setText(statusText);
+}
+
+void ControlUI::onReceiverSettingsChanged(const QString &address, quint16 port) {
+    addressEdit->setText(address);
+    portSpinBox->setValue(static_cast<int>(port));
+}
+
+void ControlUI::onAiStatusChanged(const QString &statusText) {
+    aiStatusLabel->setText(statusText);
 }
 
 void ControlUI::onBrightnessChanged(int value) {
@@ -389,6 +556,7 @@ void ControlUI::onTakeSnapshot() {
         QMessageBox::warning(this, "Save Directory Not Set", "Please select a save directory first.");
         return;
     }
+
     emit snapshotRequested(saveDirectory);
 }
 
@@ -398,7 +566,7 @@ void ControlUI::onRecordVideo() {
         return;
     }
 
-    QString format = formatComboBox->currentText();
+    const QString format = formatComboBox->currentText();
     if (format != "mp4" && format != "avi") {
         QMessageBox::warning(this, "Unsupported Format", QString("Format %1 is not supported.").arg(format));
         return;
@@ -407,14 +575,14 @@ void ControlUI::onRecordVideo() {
     emit recordingRequested(saveDirectory, format);
 }
 
-void ControlUI::onRecordingStateChanged(bool isRecording) {
-    const bool wasRecording = this->isRecording;
-    this->isRecording = isRecording;
-    recordButton->setProperty("recording", isRecording);
+void ControlUI::onRecordingStateChanged(bool recording) {
+    const bool wasRecording = isRecording;
+    isRecording = recording;
+    recordButton->setProperty("recording", recording);
     recordButton->style()->unpolish(recordButton);
     recordButton->style()->polish(recordButton);
 
-    if (isRecording) {
+    if (recording) {
         recordButton->setText("Stop Recording");
         recordingElapsedTimer.start();
 
@@ -436,14 +604,15 @@ void ControlUI::onRecordingStateChanged(bool isRecording) {
 
         if (!wasRecording) {
             QMessageBox::warning(this, "Recording Failed", "Failed to start or save the video. Please check the save directory and format.");
-        } else {
-            qDebug() << "Recording stopped successfully.";
         }
     }
 }
 
 void ControlUI::onBrowseSaveDirectory() {
-    QString dir = QFileDialog::getExistingDirectory(this, tr("Select Save Directory"), "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    const QString dir = QFileDialog::getExistingDirectory(this,
+                                                          tr("Select Save Directory"),
+                                                          "",
+                                                          QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
     if (!dir.isEmpty()) {
         saveDirectory = dir;
         saveDirectoryLabel->setText("Save Directory: " + saveDirectory);
@@ -456,4 +625,19 @@ void ControlUI::onFlipHorizontalChanged(bool checked) {
 
 void ControlUI::onFlipVerticalChanged(bool checked) {
     emit flipVerticalRequested(checked);
+}
+
+void ControlUI::onApplyReceiverSettings() {
+    const QString address = addressEdit->text().trimmed();
+    if (address.isEmpty()) {
+        QMessageBox::warning(this, "Bind Address Required", "Please enter a bind address before applying receiver settings.");
+        return;
+    }
+
+    receiverStatusLabel->setText(QString("Receiver: applying %1:%2 ...").arg(address).arg(portSpinBox->value()));
+    emit receiverSettingsRequested(address, static_cast<quint16>(portSpinBox->value()));
+}
+
+void ControlUI::onAiDetectionChanged(bool checked) {
+    emit aiDetectionToggled(checked);
 }

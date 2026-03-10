@@ -36,11 +36,16 @@ public slots:
     void setGamma(int value);
     void setSharpness(int value);
     void setDenoise(int value);
+    void applyReceiverSettings(const QString &address, quint16 port);
+    void setAiDetectionEnabled(bool enabled);
 
 signals:
     void recordingStateChanged(bool isRecording);
     void fpsChanged(int fps);
     void performanceStatsChanged(const QString &statsText);
+    void receiverStatusChanged(const QString &statusText);
+    void receiverSettingsChanged(const QString &address, quint16 port);
+    void aiStatusChanged(const QString &statusText);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -49,6 +54,7 @@ private slots:
     void updateFPS();
     void enqueueFrameBatch(const QList<QByteArray> &batch);
     void drainPendingBatches();
+    void onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message);
 
 private:
     static bool isMarkerPacket(const QByteArray &data, char marker);
@@ -58,6 +64,7 @@ private:
     void refreshDisplayImage();
     void applyProcessing(const cv::Mat &sourceRgb, cv::Mat &destRgb) const;
     QImage buildOutputFrame(const QImage &sourceFrame) const;
+    void resetParserState();
 
     QImage rawImage;
     QImage displayImage;
@@ -100,6 +107,9 @@ private:
     int gammaValue;
     int sharpnessValue;
     int denoiseValue;
+    QString receiverAddress;
+    quint16 receiverPort;
+    bool aiDetectionEnabled;
     cv::VideoWriter videoWriter;
     bool isRecording;
 };

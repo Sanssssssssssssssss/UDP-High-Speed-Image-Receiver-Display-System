@@ -27,8 +27,16 @@ const int kMaxBatchPackets = 256;
 UdpReceiver::UdpReceiver(QObject *parent)
     : QObject(parent),
       mrecv(new QUdpSocket(this)),
-      tsharkProcess(new QProcess(this)) {
+      tsharkProcess(new QProcess(this)),
+      boundPort(0) {
     qRegisterMetaType<QList<QByteArray> >("QList<QByteArray>");
+    qRegisterMetaType<quint16>("quint16");
+
+    connect(mrecv, &QUdpSocket::readyRead, this, &UdpReceiver::readPendingDatagrams);
+    connect(mrecv, &QUdpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError socketError) {
+        Q_UNUSED(socketError);
+        qWarning() << "UDP socket error:" << mrecv->errorString();
+    });
 }
 
 UdpReceiver::~UdpReceiver() {
@@ -45,22 +53,44 @@ UdpReceiver::~UdpReceiver() {
 void UdpReceiver::startReceiving(const QString &address, quint16 port) {
     QHostAddress maddr(address);
 
-    if (!mrecv->bind(maddr, port, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
-        qWarning() << "Failed to bind to address:" << address << "port:" << port;
+    if (maddr.isNull()) {
+        const QString message = QString("Bind failed: invalid address %1").arg(address);
+        qWarning() << message;
+        emit receiverBindingChanged(address, port, false, message);
         return;
     }
 
+    stopReceiving();
+
+    if (!mrecv->bind(maddr, port, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
+        const QString message = QString("Bind failed on %1:%2 (%3)")
+                                    .arg(address)
+                                    .arg(port)
+                                    .arg(mrecv->errorString());
+        qWarning() << message;
+        emit receiverBindingChanged(address, port, false, message);
+        return;
+    }
+
+    boundAddress = address;
+    boundPort = port;
     mrecv->setReadBufferSize(kDesiredReceiveBufferBytes);
     mrecv->setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption, kDesiredReceiveBufferBytes);
-    qDebug() << "Listening for UDP packets on" << address << "port" << port
-             << "requested receive buffer =" << kDesiredReceiveBufferBytes
-             << "actual receive buffer =" << mrecv->socketOption(QAbstractSocket::ReceiveBufferSizeSocketOption).toInt();
+    const int actualBuffer = mrecv->socketOption(QAbstractSocket::ReceiveBufferSizeSocketOption).toInt();
+    const QString message = QString("Listening on %1:%2 | recv buffer=%3 bytes")
+                                .arg(address)
+                                .arg(port)
+                                .arg(actualBuffer);
+    qDebug() << message;
+    emit receiverBindingChanged(address, port, true, message);
+}
 
-    connect(mrecv, &QUdpSocket::readyRead, this, &UdpReceiver::readPendingDatagrams);
-    connect(mrecv, &QUdpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError socketError) {
-        Q_UNUSED(socketError);
-        qWarning() << "UDP socket error:" << mrecv->errorString();
-    });
+void UdpReceiver::stopReceiving() {
+    if (!mrecv->isOpen()) {
+        return;
+    }
+
+    mrecv->close();
 }
 
 void UdpReceiver::startTshark(const QString &interfaceName) {

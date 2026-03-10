@@ -68,6 +68,9 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
       gammaValue(0),
       sharpnessValue(0),
       denoiseValue(0),
+      receiverAddress("0.0.0.0"),
+      receiverPort(8080),
+      aiDetectionEnabled(false),
       isRecording(false) {
     rawImage = QImage(kFrameWidth, kFrameHeight, QImage::Format_RGB888);
     rawImage.fill(Qt::black);
@@ -83,10 +86,24 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
     receiver = new UdpReceiver();
     receiverThread = new QThread();
     receiver->moveToThread(receiverThread);
-    connect(receiverThread, &QThread::started, receiver, [=]() { receiver->startReceiving("0.0.0.0", 8080); });
+    connect(receiverThread, &QThread::started, this, [this]() {
+        QMetaObject::invokeMethod(receiver,
+                                  "startReceiving",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(QString, receiverAddress),
+                                  Q_ARG(quint16, receiverPort));
+    });
     connect(receiver, &UdpReceiver::newFrameBatch, this, &UdpFrameProcessor::enqueueFrameBatch, Qt::DirectConnection);
+    connect(receiver,
+            &UdpReceiver::receiverBindingChanged,
+            this,
+            &UdpFrameProcessor::onReceiverBindingChanged,
+            Qt::QueuedConnection);
     connect(receiverThread, &QThread::finished, receiverThread, &QObject::deleteLater);
     receiverThread->start();
+
+    emit receiverSettingsChanged(receiverAddress, receiverPort);
+    emit aiStatusChanged("AI detection is disabled.");
 }
 
 UdpFrameProcessor::~UdpFrameProcessor() {
@@ -249,6 +266,18 @@ void UdpFrameProcessor::updateFPS() {
     parserResyncEventsThisSecond = 0;
 }
 
+void UdpFrameProcessor::resetParserState() {
+    frameValid = false;
+    currentLine = 0;
+    frameBuffer.fill(QByteArray());
+    receivedLineFlags.fill(false);
+
+    QMutexLocker pendingLock(&pendingBatchMutex);
+    pendingBatches.clear();
+    pendingPacketCount = 0;
+    parserResyncPending = false;
+}
+
 void UdpFrameProcessor::enqueueFrameBatch(const QList<QByteArray> &batch) {
     if (batch.isEmpty()) {
         return;
@@ -309,6 +338,12 @@ void UdpFrameProcessor::drainPendingBatches() {
             processFrameData(*it);
         }
     }
+}
+
+void UdpFrameProcessor::onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message) {
+    Q_UNUSED(address);
+    Q_UNUSED(port);
+    emit receiverStatusChanged(ok ? message : QString("Receiver error: %1").arg(message));
 }
 
 void UdpFrameProcessor::processFrameData(const QByteArray &data) {
@@ -530,6 +565,38 @@ void UdpFrameProcessor::setDenoise(int value) {
     denoiseValue = value;
     refreshDisplayImage();
     update();
+}
+
+void UdpFrameProcessor::applyReceiverSettings(const QString &address, quint16 port) {
+    receiverAddress = address.trimmed();
+    receiverPort = port;
+    resetParserState();
+
+    {
+        QMutexLocker imageLock(&imageMutex);
+        rawImage.fill(Qt::black);
+        displayImage = rawImage.copy();
+    }
+
+    emit receiverStatusChanged(QString("Rebinding receiver to %1:%2 ...").arg(receiverAddress).arg(receiverPort));
+    emit receiverSettingsChanged(receiverAddress, receiverPort);
+
+    QMetaObject::invokeMethod(receiver,
+                              "startReceiving",
+                              Qt::QueuedConnection,
+                              Q_ARG(QString, receiverAddress),
+                              Q_ARG(quint16, receiverPort));
+    update();
+}
+
+void UdpFrameProcessor::setAiDetectionEnabled(bool enabled) {
+    aiDetectionEnabled = enabled;
+
+    if (enabled) {
+        emit aiStatusChanged("AI detection armed. No model is configured yet, so inference stays idle.");
+    } else {
+        emit aiStatusChanged("AI detection is disabled.");
+    }
 }
 
 QImage UdpFrameProcessor::buildOutputFrame(const QImage &sourceFrame) const {

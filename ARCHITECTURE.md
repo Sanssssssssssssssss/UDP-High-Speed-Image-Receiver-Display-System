@@ -12,27 +12,29 @@
 ## 2. Current Modules
 
 ### `UdpReceiver`
-- Owns UDP socket, tshark process, and periodic buffer-clearing timer.
-- Receives datagrams and emits raw packet payloads upstream.
+- Owns the UDP socket and optional tshark bootstrap process.
+- Receives datagrams in bounded batches and emits raw packet payload batches upstream.
+- Supports receiver-side rebind to a new address/port without restarting the full application.
 
 ### `UdpFrameProcessor`
 - Owns receive thread and frame reconstruction logic.
 - Detects frame start/end markers.
 - Buffers line data, interpolates missing lines, converts RGB565 to RGB888, and renders the frame.
-- Handles snapshot/video recording and FPS reporting.
+- Handles snapshot/video recording, runtime receiver rebind, FPS reporting, and receiver/AI status fan-out to the UI.
 
 ### `ControlUI`
-- Exposes UI controls for FPS display, save path, recording, snapshot, and flip settings.
-- Emits adjustment signals for brightness/gamma/sharpness/denoise, but those are not wired into processing yet.
+- Keeps stream status pinned while exposing switchable subpages for image tuning, capture, network, and AI controls.
+- Emits adjustment signals for brightness/gamma/sharpness/denoise, flip state, runtime bind address/port changes, and AI enable state.
 
 ## 3. Current Data Flow
 1. `main.cpp` creates `UdpFrameProcessor` and `ControlUI`.
-2. `src/app/main.cpp` now also starts a lightweight local UDP demo sender for startup verification.
+2. `src/app/main.cpp` can optionally start a local UDP stress demo for startup verification.
 3. `UdpFrameProcessor` creates `UdpReceiver` on a worker thread.
-4. `UdpReceiver` binds UDP socket and emits `newFrameData`.
+4. `UdpReceiver` binds the UDP socket and emits `newFrameBatch`.
 5. `UdpFrameProcessor::processFrameData` reconstructs image lines and updates the current `QImage`.
-6. Widget repaint displays the latest frame.
-7. Optional snapshot/recording consumes the current frame.
+6. `ControlUI` can request runtime receiver rebind or AI enable-state changes through queued signals.
+7. Widget repaint displays the latest frame.
+8. Optional snapshot/recording consumes the current frame.
 
 ## 4. Architectural Constraints
 - Preserve the existing Qt Widgets baseline for the first milestone.

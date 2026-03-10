@@ -38,9 +38,9 @@
 - The system shall allow horizontal and vertical flip controls for the displayed image.
 
 ### FR-008 Runtime configuration instead of hardcoded network/environment values
-- Status: Assumed
-- The system should allow configuration of bind IP, port, and external tool paths without source-code edits.
-- Reason: current code hardcodes network and tool paths, which blocks portability.
+- Status: Confirmed
+- The system shall allow runtime reconfiguration of the receiver bind IP and port from the UI without source-code edits.
+- Reason: the control panel now exposes bind address and port fields with receiver-side rebind support.
 
 ### FR-009 Local demo mode without dedicated hardware
 - Status: Confirmed
@@ -50,6 +50,14 @@
 ### FR-010 Brightness/gamma/sharpness/denoise controls affect image output
 - Status: Confirmed
 - The UI shall apply brightness, gamma, sharpness, and denoise controls locally on the receiver-side image output without changing the incoming UDP packet semantics.
+
+### FR-011 Paged control surface for operator workflow
+- Status: Confirmed
+- The system shall keep live stream status visible while moving image tuning, capture, network, and AI controls into switchable subpages on the right-side control surface.
+
+### FR-012 Operator-facing AI control entry
+- Status: Confirmed
+- The system shall expose an explicit AI detection enable/disable control and status area in the UI, even when inference remains optional and model-dependent.
 
 ## 3. Non-Functional Requirements
 

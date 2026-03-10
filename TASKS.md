@@ -12,6 +12,7 @@
 - [ ] Define the target compatibility matrix for supported Windows/Qt/OpenCV combinations.
 - [ ] Decide the future inference acceleration direction and backend strategy.
 - [ ] Replace remaining hardcoded runtime configuration with receiver-side configurable parameters.
+- [ ] Replace AI placeholder control with a verified model-backed inference path once the runtime/model location is defined.
 - [ ] Benchmark and optimize RGB565 -> RGB888 conversion further with SIMD if LUT is not sufficient.
 
 ## In Progress
@@ -51,6 +52,9 @@
 - [x] Build the project successfully with the local VS Code toolchain flow.
 - [x] Complete a startup smoke test by launching the built executable successfully.
 - [x] Rebuild and smoke-test the application after the display/processing/recording refactor.
+- [x] Split the right-side control surface into status + paged subviews for image, capture, network, and AI controls.
+- [x] Add operator-editable bind address and port controls with receiver-side rebind support.
+- [x] Add an explicit AI control entry and status pane in the UI without forcing inference onto the hot path.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.
