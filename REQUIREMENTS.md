@@ -14,7 +14,7 @@
 
 ### FR-002 Reconstruct image frames from UDP packets
 - Status: Confirmed
-- The system shall reconstruct image frames from ordered UDP payloads using frame start, line payload, and frame end semantics.
+- The system shall reconstruct image frames from ordered UDP payloads using an all-`0xAA` frame-start packet, sequential line payload packets, and an all-`0xBB` frame-end packet.
 - Source basis: `UdpFrameProcessor::processFrameData`.
 
 ### FR-003 Display reconstructed frames in the desktop UI
@@ -82,6 +82,7 @@
 - If a requirement is unclear, record the assumption before implementation.
 - Do not replace the current Qt/C++ stack without explicit approval.
 - Do not change the upstream UDP packet format, sender-side construction flow, or pixel transfer semantics; optimization is limited to the receiver-side implementation.
+- Do not assume the presence of protocol fields that are not actually carried on the wire; in particular, the current UDP line packets must be treated as sequential payloads without an explicit line index unless the user confirms otherwise.
 
 ## 5. Acceptance Criteria For First Runnable Version
 - The project builds in a documented local environment.

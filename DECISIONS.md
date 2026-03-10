@@ -96,11 +96,11 @@
 - Decision: the receiver must not periodically discard pending datagrams, packet delivery from the socket thread to the UI-side processor should be batched rather than queued one datagram at a time, and the user-space pending queue must remain bounded to a small number of frame-equivalents.
 - Reason: periodic buffer clearing was an explicit packet-loss source, per-datagram queued delivery adds avoidable event-loop pressure under high-rate traffic, and an unbounded pending queue would hide overload until latency becomes unusable.
 
-## D-017 Reconstruct frames by packet line index, not arrival order
+## D-017 Reconstruct frames by sequential line order within A/B frame markers
 - Status: Accepted
 - Date: 2026-03-10
-- Decision: line packets must be written into the frame buffer using the line number carried in the UDP packet header instead of assuming packets arrive in perfect order without loss.
-- Reason: the protocol is line-based; using arrival order shifts all subsequent rows after a single drop and makes the visible failure mode much worse than the real transport loss.
+- Decision: line packets are written sequentially between an all-`0xAA` frame-start packet and an all-`0xBB` frame-end packet, because the UDP line payloads do not carry an explicit line index in the protocol.
+- Reason: this matches the actual immutable sender-side protocol confirmed by the user; receiver logic must not invent a line-number field that does not exist on the wire.
 
 ## D-018 Do not enable local stress demo or tshark bootstrap by default
 - Status: Accepted

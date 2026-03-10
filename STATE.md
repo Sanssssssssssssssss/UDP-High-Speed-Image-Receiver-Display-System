@@ -17,9 +17,9 @@
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
-- Frame reconstruction now uses the line index carried in each UDP packet, so dropped rows stay localized instead of shifting the entire rest of the image.
+- Frame reconstruction follows the confirmed immutable protocol: all-`0xAA` starts a frame, all-`0xBB` ends a frame, and line payloads are consumed sequentially between them because the UDP line packets do not carry an explicit line index.
 - The app now starts in hardware mode by default; the local UDP stress demo and tshark bootstrap only start when explicitly requested.
-- The UI performance text now exposes marker imbalance, orphan/duplicate/out-of-range line packets, queue drops, and parser resync counts for live debugging.
+- The UI performance text now exposes marker imbalance, orphan/overflow line packets, short frame ends, queue drops, and parser resync counts for live debugging.
 - A `.vscode` workspace and `scripts/vscode-qt.ps1` toolchain script have been added for this machine.
 - A local Qt 5.15.2 + MinGW 8.1 + OpenCV 3.4.8 toolchain is now installed under `.local/toolchain`.
 - The project now builds successfully through the VS Code task flow, and the executable has passed a startup smoke test on this machine.

@@ -78,9 +78,10 @@ private:
     quint64 startWithoutEndThisSecond;
     quint64 endWithoutStartThisSecond;
     quint64 orphanLinePacketsThisSecond;
-    quint64 duplicateLinePacketsThisSecond;
-    quint64 outOfRangeLinePacketsThisSecond;
+    quint64 overflowLinePacketsThisSecond;
+    quint64 shortFrameEndsThisSecond;
     quint64 parserResyncEventsThisSecond;
+    int currentLine;
     bool frameValid;
     QVector<QByteArray> frameBuffer;
     QVector<bool> receivedLineFlags;
