@@ -126,9 +126,14 @@ private:
 int runApplication(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setFont(QFont("Segoe UI", 11));
+    const QStringList args = app.arguments();
+    const bool enableDemo = args.contains("--demo") || qEnvironmentVariableIntValue("POST_TRAIN_DEMO") == 1;
+    const bool enableCaptureBootstrap = args.contains("--capture-bootstrap") || qEnvironmentVariableIntValue("POST_TRAIN_CAPTURE") == 1;
 
-    UdpReceiver receiver;
-    receiver.startTshark("Ethernet");
+    UdpReceiver captureBootstrap;
+    if (enableCaptureBootstrap) {
+        captureBootstrap.startTshark("Ethernet");
+    }
 
     QWidget mainWidget;
     mainWidget.setObjectName("MainWindow");
@@ -200,14 +205,17 @@ int runApplication(int argc, char *argv[]) {
     videoTitle->setObjectName("VideoTitle");
     videoHeaderTextLayout->addWidget(videoTitle);
 
-    auto *videoSubtitle = new QLabel("Local demo traffic now stresses the receiver at 60 fps and about 24k UDP packets per second so the full receive path stays measurable at startup.", videoPanel);
+    const QString subtitleText = enableDemo
+        ? "Local demo traffic is active at 60 fps and about 24k UDP packets per second for stress testing."
+        : "Hardware input mode is active. Start with --demo or POST_TRAIN_DEMO=1 when you want the built-in UDP stress source.";
+    auto *videoSubtitle = new QLabel(subtitleText, videoPanel);
     videoSubtitle->setObjectName("VideoSubtitle");
     videoSubtitle->setWordWrap(true);
     videoHeaderTextLayout->addWidget(videoSubtitle);
 
     videoHeaderLayout->addLayout(videoHeaderTextLayout, 1);
 
-    auto *modeBadge = new QLabel("LOOPBACK DEMO", videoPanel);
+    auto *modeBadge = new QLabel(enableDemo ? "LOOPBACK DEMO" : "HARDWARE INPUT", videoPanel);
     modeBadge->setObjectName("ModeBadge");
     modeBadge->setAlignment(Qt::AlignCenter);
     videoHeaderLayout->addWidget(modeBadge, 0, Qt::AlignTop);
@@ -225,8 +233,10 @@ int runApplication(int argc, char *argv[]) {
     controlUI->setFixedWidth(450);
     mainLayout->addWidget(controlUI);
 
-    LocalDemoSender *demoSender = new LocalDemoSender(&mainWidget);
-    Q_UNUSED(demoSender);
+    if (enableDemo) {
+        LocalDemoSender *demoSender = new LocalDemoSender(&mainWidget);
+        Q_UNUSED(demoSender);
+    }
 
     QObject::connect(videoDisplay, &UdpFrameProcessor::fpsChanged, controlUI, &ControlUI::onFPSChanged);
     QObject::connect(videoDisplay, &UdpFrameProcessor::performanceStatsChanged, controlUI, &ControlUI::onPerformanceStatsChanged);

@@ -73,7 +73,14 @@ private:
     quint64 droppedPacketsThisSecond;
     quint64 droppedBatchesThisSecond;
     quint64 maxQueuedPacketsThisSecond;
-    int currentLine;
+    quint64 startMarkersThisSecond;
+    quint64 endMarkersThisSecond;
+    quint64 startWithoutEndThisSecond;
+    quint64 endWithoutStartThisSecond;
+    quint64 orphanLinePacketsThisSecond;
+    quint64 duplicateLinePacketsThisSecond;
+    quint64 outOfRangeLinePacketsThisSecond;
+    quint64 parserResyncEventsThisSecond;
     bool frameValid;
     QVector<QByteArray> frameBuffer;
     QVector<bool> receivedLineFlags;

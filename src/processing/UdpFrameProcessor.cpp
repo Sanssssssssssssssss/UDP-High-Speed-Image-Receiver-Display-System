@@ -45,7 +45,14 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
       droppedPacketsThisSecond(0),
       droppedBatchesThisSecond(0),
       maxQueuedPacketsThisSecond(0),
-      currentLine(0),
+      startMarkersThisSecond(0),
+      endMarkersThisSecond(0),
+      startWithoutEndThisSecond(0),
+      endWithoutStartThisSecond(0),
+      orphanLinePacketsThisSecond(0),
+      duplicateLinePacketsThisSecond(0),
+      outOfRangeLinePacketsThisSecond(0),
+      parserResyncEventsThisSecond(0),
       frameValid(false),
       frameBuffer(kFrameHeight),
       receivedLineFlags(kFrameHeight, false),
@@ -204,11 +211,19 @@ void UdpFrameProcessor::updateFPS() {
     const double avgInterpolationMs = completedFramesThisSecond > 0
         ? static_cast<double>(interpolationNsThisSecond) / static_cast<double>(completedFramesThisSecond) / 1000000.0
         : 0.0;
-    const QString statsText = QString("Perf: pkts/s=%1 | frame=%2 ms | interp=%3 ms | recovered lines/s=%4 | dropped pkts/s=%5 | queue max=%6/%7")
+    const QString statsText = QString("Perf: pkts/s=%1 | frame=%2 ms | interp=%3 ms | recovered lines/s=%4\nmarkers start/end=%5/%6 | start-no-end=%7 | end-no-start=%8 | orphan=%9 | dup=%10 | range=%11 | resync=%12\nqueue dropped pkts/s=%13 | queue max=%14/%15")
                                   .arg(datagramsThisSecond)
                                   .arg(avgFrameMs, 0, 'f', 3)
                                   .arg(avgInterpolationMs, 0, 'f', 3)
                                   .arg(recoveredLinesThisSecond)
+                                  .arg(startMarkersThisSecond)
+                                  .arg(endMarkersThisSecond)
+                                  .arg(startWithoutEndThisSecond)
+                                  .arg(endWithoutStartThisSecond)
+                                  .arg(orphanLinePacketsThisSecond)
+                                  .arg(duplicateLinePacketsThisSecond)
+                                  .arg(outOfRangeLinePacketsThisSecond)
+                                  .arg(parserResyncEventsThisSecond)
                                   .arg(droppedPacketsThisSecond)
                                   .arg(maxQueuedPacketsThisSecond)
                                   .arg(kMaxQueuedPackets);
@@ -223,6 +238,14 @@ void UdpFrameProcessor::updateFPS() {
     droppedPacketsThisSecond = 0;
     droppedBatchesThisSecond = 0;
     maxQueuedPacketsThisSecond = 0;
+    startMarkersThisSecond = 0;
+    endMarkersThisSecond = 0;
+    startWithoutEndThisSecond = 0;
+    endWithoutStartThisSecond = 0;
+    orphanLinePacketsThisSecond = 0;
+    duplicateLinePacketsThisSecond = 0;
+    outOfRangeLinePacketsThisSecond = 0;
+    parserResyncEventsThisSecond = 0;
 }
 
 void UdpFrameProcessor::enqueueFrameBatch(const QList<QByteArray> &batch) {
@@ -275,9 +298,9 @@ void UdpFrameProcessor::drainPendingBatches() {
 
         if (needResync) {
             frameValid = false;
-            currentLine = 0;
             frameBuffer.fill(QByteArray());
             receivedLineFlags.fill(false);
+            ++parserResyncEventsThisSecond;
         }
 
         for (QList<QByteArray>::const_iterator it = batch.cbegin(); it != batch.cend(); ++it) {
@@ -295,36 +318,47 @@ void UdpFrameProcessor::processFrameData(const QByteArray &data) {
     }
 
     if (isMarkerPacket(data, char(0xAA))) {
+        ++startMarkersThisSecond;
+        if (frameValid) {
+            ++startWithoutEndThisSecond;
+        }
         frameValid = true;
-        currentLine = 0;
         frameBuffer.fill(QByteArray());
         receivedLineFlags.fill(false);
         return;
     }
 
     if (isMarkerPacket(data, char(0xBB))) {
+        ++endMarkersThisSecond;
         if (frameValid) {
             finalizeFrame();
+        } else {
+            ++endWithoutStartThisSecond;
         }
         frameValid = false;
         return;
     }
 
     if (!frameValid) {
+        ++orphanLinePacketsThisSecond;
         return;
     }
 
-    if (currentLine < 0 || currentLine >= kFrameHeight) {
-        qWarning() << "Invalid line number:" << currentLine;
+    const int lineIndex = (static_cast<unsigned char>(data[2]) << 8) | static_cast<unsigned char>(data[3]);
+    if (lineIndex < 0 || lineIndex >= kFrameHeight) {
+        ++outOfRangeLinePacketsThisSecond;
         return;
     }
 
     const int payloadSize = data.size() - kPacketHeaderSize;
-    QByteArray &lineBuffer = frameBuffer[currentLine];
+    if (receivedLineFlags[lineIndex]) {
+        ++duplicateLinePacketsThisSecond;
+    }
+
+    QByteArray &lineBuffer = frameBuffer[lineIndex];
     lineBuffer.resize(payloadSize);
     std::memcpy(lineBuffer.data(), data.constData() + kPacketHeaderSize, static_cast<size_t>(payloadSize));
-    receivedLineFlags[currentLine] = true;
-    ++currentLine;
+    receivedLineFlags[lineIndex] = true;
 }
 
 void UdpFrameProcessor::finalizeFrame() {

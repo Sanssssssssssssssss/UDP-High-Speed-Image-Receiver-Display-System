@@ -95,3 +95,15 @@
 - Date: 2026-03-10
 - Decision: the receiver must not periodically discard pending datagrams, packet delivery from the socket thread to the UI-side processor should be batched rather than queued one datagram at a time, and the user-space pending queue must remain bounded to a small number of frame-equivalents.
 - Reason: periodic buffer clearing was an explicit packet-loss source, per-datagram queued delivery adds avoidable event-loop pressure under high-rate traffic, and an unbounded pending queue would hide overload until latency becomes unusable.
+
+## D-017 Reconstruct frames by packet line index, not arrival order
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: line packets must be written into the frame buffer using the line number carried in the UDP packet header instead of assuming packets arrive in perfect order without loss.
+- Reason: the protocol is line-based; using arrival order shifts all subsequent rows after a single drop and makes the visible failure mode much worse than the real transport loss.
+
+## D-018 Do not enable local stress demo or tshark bootstrap by default
+- Status: Accepted
+- Date: 2026-03-10
+- Decision: the application starts in hardware-input mode by default, while the built-in 60 fps stress demo and tshark capture bootstrap are enabled only via explicit flags or environment variables.
+- Reason: always-on synthetic traffic and capture bootstrap add avoidable startup load and interfere with real hardware validation.

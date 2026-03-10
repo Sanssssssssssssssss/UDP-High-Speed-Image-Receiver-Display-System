@@ -42,6 +42,9 @@
 - [x] Increase the requested UDP socket receive buffer on startup.
 - [x] Upgrade the built-in UDP demo sender to a 60 fps stress mode at roughly 24k packets per second.
 - [x] Add a bounded pending-batch queue with overload dropping and resync behavior on the processor side.
+- [x] Switch frame reconstruction to use the packet-carried line index instead of arrival order.
+- [x] Add debug counters for marker imbalance, orphan line packets, duplicate lines, out-of-range lines, queue drops, and parser resyncs.
+- [x] Make the local stress demo and tshark bootstrap opt-in instead of always-on.
 - [x] Add VS Code workspace files and a local Windows PowerShell toolchain detection script.
 - [x] Install a local Qt 5.15.2 + MinGW 8.1 + OpenCV 3.4.8 toolchain under `.local/toolchain`.
 - [x] Configure user environment variables `QT_QMAKE`, `MINGW_MAKE`, `GDB_PATH`, and `OPENCV_ROOT`.
