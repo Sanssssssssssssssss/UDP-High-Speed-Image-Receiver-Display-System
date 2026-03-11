@@ -62,6 +62,7 @@
 - [x] Produce a portable package directory and zip under `dist/` for running on other Windows machines.
 - [x] Replace per-line `QByteArray` frame storage with a contiguous frame buffer to reduce allocations and interpolation overhead.
 - [x] Increase receiver batch size to cut cross-thread signal churn under high packet rates.
+- [x] Move the built-in demo sender off the GUI thread so local stress testing does not self-throttle the UI path as heavily.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

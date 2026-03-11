@@ -155,3 +155,9 @@
 - Date: 2026-03-11
 - Decision: increase the receiver-side datagram batch size so the socket thread emits fewer batch signals under sustained load.
 - Reason: under 24k packets per second, too-small batch sizes create avoidable cross-thread/container overhead even when packet parsing logic is unchanged.
+
+## D-027 Keep the built-in demo sender off the GUI thread
+- Status: Accepted
+- Date: 2026-03-11
+- Decision: run the local loopback stress sender on a dedicated worker thread instead of the main GUI thread.
+- Reason: when the sender shares the GUI thread, local stress testing can under-report throughput and make the UI path look worse than the real receive-side pipeline alone.

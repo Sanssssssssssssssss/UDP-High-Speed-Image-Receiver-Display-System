@@ -239,6 +239,12 @@ void UdpFrameProcessor::paintEvent(QPaintEvent *event) {
 }
 
 void UdpFrameProcessor::updateFPS() {
+    int currentQueuedPackets = 0;
+    {
+        QMutexLocker lock(&pendingBatchMutex);
+        currentQueuedPackets = pendingPacketCount;
+    }
+
     emit fpsChanged(presentedFrameCount);
 
     const double avgFrameMs = completedFramesThisSecond > 0
@@ -249,7 +255,7 @@ void UdpFrameProcessor::updateFPS() {
         : 0.0;
     const double drainMsThisSecond = static_cast<double>(drainNsThisSecond) / 1000000.0;
     const double maxDrainMs = static_cast<double>(maxDrainNsThisSecond) / 1000000.0;
-    const QString finalStatsText = QString("Perf: pkts/s=%1 | parse fps=%2 | present fps=%3 | frame=%4 ms | interp=%5 ms | drain=%6 ms/s | drain max=%7 ms | recovered lines/s=%8\nmarkers start/end=%9/%10 | start-no-end=%11 | end-no-start=%12 | orphan=%13 | overflow=%14 | short-end=%15 | resync=%16\nqueue dropped pkts/s=%17 | queue max=%18/%19")
+    const QString finalStatsText = QString("Perf: pkts/s=%1 | parse fps=%2 | present fps=%3 | frame=%4 ms | interp=%5 ms | drain=%6 ms/s | drain max=%7 ms | recovered lines/s=%8\nmarkers start/end=%9/%10 | start-no-end=%11 | end-no-start=%12 | orphan=%13 | overflow=%14 | short-end=%15 | resync=%16\nqueue cur=%17 | dropped pkts/s=%18 | dropped batches/s=%19 | queue max=%20/%21")
                                   .arg(datagramsThisSecond)
                                   .arg(frameCount)
                                   .arg(presentedFrameCount)
@@ -266,7 +272,9 @@ void UdpFrameProcessor::updateFPS() {
                                   .arg(overflowLinePacketsThisSecond)
                                   .arg(shortFrameEndsThisSecond)
                                   .arg(parserResyncEventsThisSecond)
+                                  .arg(currentQueuedPackets)
                                   .arg(droppedPacketsThisSecond)
+                                  .arg(droppedBatchesThisSecond)
                                   .arg(maxQueuedPacketsThisSecond)
                                   .arg(kMaxQueuedPackets);
     emit performanceStatsChanged(finalStatsText);

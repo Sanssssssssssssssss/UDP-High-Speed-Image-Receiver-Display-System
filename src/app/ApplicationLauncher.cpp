@@ -29,6 +29,7 @@ record video.
 #include <QFont>
 #include <QSizePolicy>
 #include <QElapsedTimer>
+#include <QThread>
 #include <QTimer>
 #include <QUdpSocket>
 #include <QVBoxLayout>
@@ -47,8 +48,16 @@ public:
           nextFrameDeadlineNs(0) {
         timer->setTimerType(Qt::PreciseTimer);
         connect(timer, &QTimer::timeout, this, [this]() { sendDueFrames(); });
+    }
+
+    void start() {
         cadenceTimer.start();
+        nextFrameDeadlineNs = 0;
         timer->start(1);
+    }
+
+    void stop() {
+        timer->stop();
     }
 
 private:
@@ -234,8 +243,15 @@ int runApplication(int argc, char *argv[]) {
     mainLayout->addWidget(controlUI);
 
     if (enableDemo) {
-        LocalDemoSender *demoSender = new LocalDemoSender(&mainWidget);
-        Q_UNUSED(demoSender);
+        QThread *demoThread = new QThread(&mainWidget);
+        LocalDemoSender *demoSender = new LocalDemoSender();
+        demoSender->moveToThread(demoThread);
+        QObject::connect(demoThread, &QThread::started, demoSender, [demoSender]() { demoSender->start(); });
+        QObject::connect(&app, &QCoreApplication::aboutToQuit, demoSender, [demoSender]() { demoSender->stop(); });
+        QObject::connect(&app, &QCoreApplication::aboutToQuit, demoThread, &QThread::quit);
+        QObject::connect(demoThread, &QThread::finished, demoSender, &QObject::deleteLater);
+        QObject::connect(demoThread, &QThread::finished, demoThread, &QObject::deleteLater);
+        demoThread->start();
     }
 
     QObject::connect(videoDisplay, &UdpFrameProcessor::fpsChanged, controlUI, &ControlUI::onFPSChanged);

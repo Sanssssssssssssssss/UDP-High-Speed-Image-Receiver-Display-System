@@ -24,6 +24,7 @@
 - Receiver-side batch size has been increased so high-rate UDP bursts spend less time on repeated batch signal emission.
 - A portable package and zip are now produced under `dist/`, and the packaged `newudp.exe` has passed a direct launch smoke test.
 - The performance stats now expose receiver-drain busy time and max drain time per second so GUI-thread starvation can be distinguished from pure link-side packet loss.
+- The built-in demo sender now runs on its own worker thread instead of sharing the main GUI thread, making local software-path stress tests less self-throttling.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
