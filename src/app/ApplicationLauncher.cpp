@@ -240,7 +240,7 @@ int runApplication(int argc, char *argv[]) {
     mainLayout->addWidget(videoPanel, 1);
 
     ControlUI *controlUI = new ControlUI(&mainWidget);
-    controlUI->setFixedWidth(560);
+    controlUI->setFixedWidth(590);
     mainLayout->addWidget(controlUI);
 
     QThread *demoThread = nullptr;

@@ -237,7 +237,7 @@ ControlUI::ControlUI(QWidget *parent)
             selection-background-color: #2a2a30;
         }
         QPushButton#PageButton {
-            min-height: 46px;
+            min-height: 42px;
             border-radius: 14px;
             background: #121214;
             color: #9f9fa7;
@@ -309,14 +309,14 @@ ControlUI::ControlUI(QWidget *parent)
     pageCard->setObjectName("Card");
     auto *pageCardLayout = new QVBoxLayout(pageCard);
     pageCardLayout->setContentsMargins(18, 18, 18, 18);
-    pageCardLayout->setSpacing(16);
+    pageCardLayout->setSpacing(14);
 
     auto *pageButtonBar = new QWidget(pageCard);
     pageButtonBar->setObjectName("PageSwitchBar");
     pageButtonLayout = new QGridLayout(pageButtonBar);
     pageButtonLayout->setContentsMargins(0, 0, 0, 0);
-    pageButtonLayout->setHorizontalSpacing(10);
-    pageButtonLayout->setVerticalSpacing(10);
+    pageButtonLayout->setHorizontalSpacing(8);
+    pageButtonLayout->setVerticalSpacing(8);
     pageButtonLayout->addWidget(createPageButton("Image", 0), 0, 0);
     pageButtonLayout->addWidget(createPageButton("Capture", 1), 0, 1);
     pageButtonLayout->addWidget(createPageButton("Network", 2), 1, 0);
@@ -433,32 +433,47 @@ QWidget *ControlUI::createNetworkPage() {
     auto *page = new QWidget(this);
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(14);
+    layout->setSpacing(12);
 
     auto *networkCard = createCard(page, "Receiver Endpoint");
     auto *networkLayout = qobject_cast<QVBoxLayout *>(networkCard->layout());
+    networkLayout->setSpacing(12);
+
+    addressEdit = new QLineEdit("0.0.0.0", networkCard);
+    addressEdit->setPlaceholderText("0.0.0.0");
+    addressEdit->setMinimumHeight(46);
 
     auto *addressLabel = new QLabel("Bind Address", networkCard);
     addressLabel->setObjectName("ControlLabel");
     networkLayout->addWidget(addressLabel);
-
-    addressEdit = new QLineEdit("0.0.0.0", networkCard);
-    addressEdit->setPlaceholderText("0.0.0.0");
     networkLayout->addWidget(addressEdit);
-
-    auto *portLabel = new QLabel("Bind Port", networkCard);
-    portLabel->setObjectName("ControlLabel");
-    networkLayout->addWidget(portLabel);
 
     portSpinBox = new QSpinBox(networkCard);
     portSpinBox->setRange(1, 65535);
     portSpinBox->setValue(8080);
-    networkLayout->addWidget(portSpinBox);
+    portSpinBox->setMinimumHeight(46);
+
+    auto *portRow = new QHBoxLayout();
+    portRow->setContentsMargins(0, 0, 0, 0);
+    portRow->setSpacing(12);
+
+    auto *portColumn = new QVBoxLayout();
+    portColumn->setContentsMargins(0, 0, 0, 0);
+    portColumn->setSpacing(8);
+
+    auto *portLabel = new QLabel("Bind Port", networkCard);
+    portLabel->setObjectName("ControlLabel");
+    portColumn->addWidget(portLabel);
+    portColumn->addWidget(portSpinBox);
+    portRow->addLayout(portColumn, 1);
 
     applyReceiverButton = new QPushButton("Apply And Rebind", networkCard);
     applyReceiverButton->setObjectName("PrimaryButton");
+    applyReceiverButton->setMinimumHeight(46);
+    applyReceiverButton->setMinimumWidth(220);
     connect(applyReceiverButton, &QPushButton::clicked, this, &ControlUI::onApplyReceiverSettings);
-    networkLayout->addWidget(applyReceiverButton);
+    portRow->addWidget(applyReceiverButton, 0, Qt::AlignBottom);
+    networkLayout->addLayout(portRow);
 
     receiverStatusLabel = new QLabel("Receiver: waiting for bind status", networkCard);
     receiverStatusLabel->setObjectName("StatusText");
@@ -470,25 +485,36 @@ QWidget *ControlUI::createNetworkPage() {
     networkHint->setWordWrap(true);
     networkLayout->addWidget(networkHint);
 
-    auto *demoCard = createCard(page, "Local Demo");
-    auto *demoLayout = qobject_cast<QVBoxLayout *>(demoCard->layout());
+    auto *divider = new QFrame(networkCard);
+    divider->setFrameShape(QFrame::HLine);
+    divider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
+    networkLayout->addWidget(divider);
 
-    demoModeCheckBox = new QCheckBox("Enable Built-in UDP Demo", demoCard);
+    auto *demoHeader = new QHBoxLayout();
+    demoHeader->setContentsMargins(0, 0, 0, 0);
+    demoHeader->setSpacing(12);
+
+    auto *demoLabel = new QLabel("Local Demo", networkCard);
+    demoLabel->setObjectName("ControlLabel");
+    demoHeader->addWidget(demoLabel);
+    demoHeader->addStretch();
+
+    demoModeCheckBox = new QCheckBox("Enable Built-in UDP Demo", networkCard);
     connect(demoModeCheckBox, &QCheckBox::toggled, this, &ControlUI::onDemoModeChanged);
-    demoLayout->addWidget(demoModeCheckBox);
+    demoHeader->addWidget(demoModeCheckBox, 0, Qt::AlignRight);
+    networkLayout->addLayout(demoHeader);
 
-    demoStatusLabel = new QLabel("Demo is disabled.", demoCard);
+    demoStatusLabel = new QLabel("Demo is disabled.", networkCard);
     demoStatusLabel->setObjectName("StatusText");
     demoStatusLabel->setWordWrap(true);
-    demoLayout->addWidget(demoStatusLabel);
+    networkLayout->addWidget(demoStatusLabel);
 
-    auto *demoHint = new QLabel("Use this to inject protocol-compatible local UDP traffic without restarting the app.", demoCard);
+    auto *demoHint = new QLabel("Use this to inject protocol-compatible local UDP traffic without restarting the app.", networkCard);
     demoHint->setObjectName("HintLabel");
     demoHint->setWordWrap(true);
-    demoLayout->addWidget(demoHint);
+    networkLayout->addWidget(demoHint);
 
     layout->addWidget(networkCard);
-    layout->addWidget(demoCard);
     layout->addStretch(1);
     return page;
 }
