@@ -8,6 +8,7 @@ namespace {
 const int kPacketHeaderSize = 4;
 const int kFrameWidth = 400;
 const int kFrameHeight = 400;
+const int kLinePayloadBytes = kFrameWidth * 2;
 const int kPacketsPerFrame = kFrameHeight + 2;
 const int kMaxQueuedFrames = 6;
 const int kMaxQueuedPackets = kPacketsPerFrame * kMaxQueuedFrames;
@@ -57,7 +58,8 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
       parserResyncEventsThisSecond(0),
       currentLine(0),
       frameValid(false),
-      frameBuffer(kFrameHeight),
+      frameData(kFrameHeight * kLinePayloadBytes, 0),
+      linePayloadSizes(kFrameHeight, 0),
       receivedLineFlags(kFrameHeight, false),
       pendingPacketCount(0),
       drainScheduled(false),
@@ -296,7 +298,7 @@ void UdpFrameProcessor::presentLatestFrame() {
 void UdpFrameProcessor::resetParserState() {
     frameValid = false;
     currentLine = 0;
-    frameBuffer.fill(QByteArray());
+    linePayloadSizes.fill(0);
     receivedLineFlags.fill(false);
 
     QMutexLocker pendingLock(&pendingBatchMutex);
@@ -356,7 +358,7 @@ void UdpFrameProcessor::drainPendingBatches() {
         if (needResync) {
             frameValid = false;
             currentLine = 0;
-            frameBuffer.fill(QByteArray());
+            linePayloadSizes.fill(0);
             receivedLineFlags.fill(false);
             ++parserResyncEventsThisSecond;
         }
@@ -388,7 +390,7 @@ void UdpFrameProcessor::processFrameData(const QByteArray &data) {
         }
         frameValid = true;
         currentLine = 0;
-        frameBuffer.fill(QByteArray());
+        linePayloadSizes.fill(0);
         receivedLineFlags.fill(false);
         return;
     }
@@ -419,9 +421,13 @@ void UdpFrameProcessor::processFrameData(const QByteArray &data) {
     }
 
     const int payloadSize = data.size() - kPacketHeaderSize;
-    QByteArray &lineBuffer = frameBuffer[currentLine];
-    lineBuffer.resize(payloadSize);
-    std::memcpy(lineBuffer.data(), data.constData() + kPacketHeaderSize, static_cast<size_t>(payloadSize));
+    const int copySize = std::min(payloadSize, kLinePayloadBytes);
+    char *lineBuffer = frameData.data() + (currentLine * kLinePayloadBytes);
+    std::memcpy(lineBuffer, data.constData() + kPacketHeaderSize, static_cast<size_t>(copySize));
+    if (copySize < kLinePayloadBytes) {
+        std::memset(lineBuffer + copySize, 0, static_cast<size_t>(kLinePayloadBytes - copySize));
+    }
+    linePayloadSizes[currentLine] = copySize;
     receivedLineFlags[currentLine] = true;
     ++currentLine;
 }
@@ -440,19 +446,28 @@ void UdpFrameProcessor::finalizeFrame() {
         }
 
         ++recoveredLines;
-        const QByteArray *topLine = (i > 0 && receivedLineFlags[i - 1]) ? &frameBuffer[i - 1] : nullptr;
-        const QByteArray *bottomLine = (i + 1 < kFrameHeight && receivedLineFlags[i + 1]) ? &frameBuffer[i + 1] : nullptr;
+        const int topIndex = (i > 0 && receivedLineFlags[i - 1]) ? (i - 1) : -1;
+        const int bottomIndex = (i + 1 < kFrameHeight && receivedLineFlags[i + 1]) ? (i + 1) : -1;
+        char *destLine = frameData.data() + (i * kLinePayloadBytes);
 
-        if (topLine != nullptr && bottomLine != nullptr) {
-            QByteArray interpolatedLine(topLine->size(), 0);
-            for (int j = 0; j < topLine->size(); ++j) {
-                interpolatedLine[j] = static_cast<char>((static_cast<unsigned char>((*topLine)[j]) + static_cast<unsigned char>((*bottomLine)[j])) / 2);
+        if (topIndex >= 0 && bottomIndex >= 0) {
+            const char *topLine = frameData.constData() + (topIndex * kLinePayloadBytes);
+            const char *bottomLine = frameData.constData() + (bottomIndex * kLinePayloadBytes);
+            for (int j = 0; j < kLinePayloadBytes; ++j) {
+                destLine[j] = static_cast<char>((static_cast<unsigned char>(topLine[j]) + static_cast<unsigned char>(bottomLine[j])) / 2);
             }
-            frameBuffer[i] = interpolatedLine;
-        } else if (topLine != nullptr) {
-            frameBuffer[i] = *topLine;
-        } else if (bottomLine != nullptr) {
-            frameBuffer[i] = *bottomLine;
+            linePayloadSizes[i] = kLinePayloadBytes;
+        } else if (topIndex >= 0) {
+            const char *topLine = frameData.constData() + (topIndex * kLinePayloadBytes);
+            std::memcpy(destLine, topLine, static_cast<size_t>(kLinePayloadBytes));
+            linePayloadSizes[i] = linePayloadSizes[topIndex];
+        } else if (bottomIndex >= 0) {
+            const char *bottomLine = frameData.constData() + (bottomIndex * kLinePayloadBytes);
+            std::memcpy(destLine, bottomLine, static_cast<size_t>(kLinePayloadBytes));
+            linePayloadSizes[i] = linePayloadSizes[bottomIndex];
+        } else {
+            std::memset(destLine, 0, static_cast<size_t>(kLinePayloadBytes));
+            linePayloadSizes[i] = 0;
         }
     }
 
@@ -462,13 +477,13 @@ void UdpFrameProcessor::finalizeFrame() {
     {
         QMutexLocker lock(&imageMutex);
         for (int i = 0; i < kFrameHeight; ++i) {
-            const QByteArray &lineData = frameBuffer[i];
-            if (lineData.isEmpty()) {
+            if (linePayloadSizes[i] <= 0) {
                 continue;
             }
 
             uchar *imageBits = rawImage.bits() + (i * rawImage.bytesPerLine());
-            const int pixelCount = lineData.size() / 2;
+            const char *lineData = frameData.constData() + (i * kLinePayloadBytes);
+            const int pixelCount = linePayloadSizes[i] / 2;
             for (int j = 0; j < pixelCount; ++j) {
                 const unsigned char high = static_cast<unsigned char>(lineData[j * 2]);
                 const unsigned char low = static_cast<unsigned char>(lineData[(j * 2) + 1]);

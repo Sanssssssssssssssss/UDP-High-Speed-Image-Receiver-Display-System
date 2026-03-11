@@ -21,7 +21,7 @@ the frame processor.
 
 namespace {
 const int kDesiredReceiveBufferBytes = 16 * 1024 * 1024;
-const int kMaxBatchPackets = 256;
+const int kMaxBatchPackets = 1024;
 }
 
 UdpReceiver::UdpReceiver(QObject *parent)

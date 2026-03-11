@@ -20,6 +20,8 @@
 - The VS Code build flow now deploys Qt, OpenCV, and MinGW runtime DLLs into the executable folder, and `build-vscode/debug/newudp.exe` can launch directly without external PATH setup.
 - The right-side page switcher no longer uses scrollable tabs; it now uses a compact multi-row button grid to keep all sections visible within the narrower control panel.
 - Presentation is now decoupled from frame parsing with a fixed refresh cadence, and the UI debug stats now show both parse FPS and present FPS.
+- Frame assembly no longer stores each received line in a separate `QByteArray`; it now uses a contiguous frame buffer with direct interpolation/copy logic to reduce hot-path allocations.
+- Receiver-side batch size has been increased so high-rate UDP bursts spend less time on repeated batch signal emission.
 - A portable package and zip are now produced under `dist/`, and the packaged `newudp.exe` has passed a direct launch smoke test.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.

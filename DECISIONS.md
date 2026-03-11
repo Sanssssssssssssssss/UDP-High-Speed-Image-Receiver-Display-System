@@ -143,3 +143,15 @@
 - Date: 2026-03-10
 - Decision: frame parsing may run as fast as data arrives, but screen presentation is driven by a fixed refresh cadence and reported separately as present FPS.
 - Reason: the previous "update on every completed frame" path could report high FPS while still looking visually stuttery because parsing and painting were not paced independently.
+
+## D-025 Use a contiguous frame buffer for line assembly
+- Status: Accepted
+- Date: 2026-03-11
+- Decision: store received line payloads in one contiguous frame buffer with per-line length metadata instead of allocating one `QByteArray` per line.
+- Reason: per-line dynamic allocation and interpolation temporary objects were wasting CPU time in the hottest receive/reconstruct path.
+
+## D-026 Favor larger UDP batch emission under high packet rates
+- Status: Accepted
+- Date: 2026-03-11
+- Decision: increase the receiver-side datagram batch size so the socket thread emits fewer batch signals under sustained load.
+- Reason: under 24k packets per second, too-small batch sizes create avoidable cross-thread/container overhead even when packet parsing logic is unchanged.

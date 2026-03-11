@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QQueue>
+#include <QByteArray>
 #include <QImage>
 #include <QList>
 #include <QMetaObject>
@@ -93,7 +94,8 @@ private:
     quint64 parserResyncEventsThisSecond;
     int currentLine;
     bool frameValid;
-    QVector<QByteArray> frameBuffer;
+    QByteArray frameData;
+    QVector<int> linePayloadSizes;
     QVector<bool> receivedLineFlags;
     QQueue<QList<QByteArray> > pendingBatches;
     QMutex pendingBatchMutex;

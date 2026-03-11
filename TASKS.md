@@ -60,6 +60,8 @@
 - [x] Replace scrollable page tabs with a compact multi-row page switcher in the right-side control panel.
 - [x] Decouple frame parsing from presentation cadence and expose parse FPS vs present FPS in the debug stats.
 - [x] Produce a portable package directory and zip under `dist/` for running on other Windows machines.
+- [x] Replace per-line `QByteArray` frame storage with a contiguous frame buffer to reduce allocations and interpolation overhead.
+- [x] Increase receiver batch size to cut cross-thread signal churn under high packet rates.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.
