@@ -36,6 +36,22 @@
       "problemMatcher": "$gcc"
     },
     {
+      "label": "Run: newudp (Hardware)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
+        "-Action",
+        "Run"
+      ],
+      "dependsOn": "Build: newudp (Debug)",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
       "label": "Run: newudp (Demo)",
       "type": "shell",
       "command": "powershell",

@@ -161,3 +161,15 @@
 - Date: 2026-03-11
 - Decision: run the local loopback stress sender on a dedicated worker thread instead of the main GUI thread.
 - Reason: when the sender shares the GUI thread, local stress testing can under-report throughput and make the UI path look worse than the real receive-side pipeline alone.
+
+## D-028 Keep the built-in demo runtime-controllable from the Network page
+- Status: Accepted
+- Date: 2026-03-11
+- Decision: expose the protocol-compatible local UDP demo as an explicit Network-page toggle that can start and stop the sender during a running session.
+- Reason: the user wants fast switching between hardware mode and local demo mode without reopening the app or dropping into PowerShell.
+
+## D-029 Keep VS Code launch paths explicit for hardware mode and demo mode
+- Status: Accepted
+- Date: 2026-03-11
+- Decision: provide separate VS Code launch/task entries for hardware-input mode and built-in demo mode instead of requiring ad hoc command-line arguments.
+- Reason: the user wants a direct editor-driven run flow and should not need to remember or type `--demo` manually each time.

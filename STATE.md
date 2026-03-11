@@ -25,6 +25,8 @@
 - A portable package and zip are now produced under `dist/`, and the packaged `newudp.exe` has passed a direct launch smoke test.
 - The performance stats now expose receiver-drain busy time and max drain time per second so GUI-thread starvation can be distinguished from pure link-side packet loss.
 - The built-in demo sender now runs on its own worker thread instead of sharing the main GUI thread, making local software-path stress tests less self-throttling.
+- The Network page now includes a built-in demo toggle so protocol-compatible local UDP traffic can be started or stopped from inside the running app.
+- VS Code now exposes separate hardware-mode and demo-mode launch entries so the app can be started without opening PowerShell manually.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
@@ -41,7 +43,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate real-hardware smoothness with the new parse/present split, then continue reducing residual startup stutter and decide how the AI page should connect to a real model/runtime path.
+- Validate the in-app demo toggle and the updated VS Code launch flow against the latest real-hardware measurements, then continue reducing residual startup stutter and decide how the AI page should connect to a real model/runtime path.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.

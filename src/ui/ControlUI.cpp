@@ -63,6 +63,8 @@ ControlUI::ControlUI(QWidget *parent)
       portSpinBox(nullptr),
       receiverStatusLabel(nullptr),
       applyReceiverButton(nullptr),
+      demoModeCheckBox(nullptr),
+      demoStatusLabel(nullptr),
       aiEnableCheckBox(nullptr),
       aiStatusLabel(nullptr),
       isRecording(false),
@@ -468,7 +470,25 @@ QWidget *ControlUI::createNetworkPage() {
     networkHint->setWordWrap(true);
     networkLayout->addWidget(networkHint);
 
+    auto *demoCard = createCard(page, "Local Demo");
+    auto *demoLayout = qobject_cast<QVBoxLayout *>(demoCard->layout());
+
+    demoModeCheckBox = new QCheckBox("Enable Built-in UDP Demo", demoCard);
+    connect(demoModeCheckBox, &QCheckBox::toggled, this, &ControlUI::onDemoModeChanged);
+    demoLayout->addWidget(demoModeCheckBox);
+
+    demoStatusLabel = new QLabel("Demo is disabled.", demoCard);
+    demoStatusLabel->setObjectName("StatusText");
+    demoStatusLabel->setWordWrap(true);
+    demoLayout->addWidget(demoStatusLabel);
+
+    auto *demoHint = new QLabel("Use this to inject protocol-compatible local UDP traffic without restarting the app.", demoCard);
+    demoHint->setObjectName("HintLabel");
+    demoHint->setWordWrap(true);
+    demoLayout->addWidget(demoHint);
+
     layout->addWidget(networkCard);
+    layout->addWidget(demoCard);
     layout->addStretch(1);
     return page;
 }
@@ -572,6 +592,15 @@ void ControlUI::onReceiverSettingsChanged(const QString &address, quint16 port) 
 
 void ControlUI::onAiStatusChanged(const QString &statusText) {
     aiStatusLabel->setText(statusText);
+}
+
+void ControlUI::onDemoStateChanged(bool enabled, const QString &statusText) {
+    if (demoModeCheckBox->isChecked() != enabled) {
+        demoModeCheckBox->blockSignals(true);
+        demoModeCheckBox->setChecked(enabled);
+        demoModeCheckBox->blockSignals(false);
+    }
+    demoStatusLabel->setText(statusText);
 }
 
 void ControlUI::onBrightnessChanged(int value) {
@@ -683,4 +712,11 @@ void ControlUI::onApplyReceiverSettings() {
 
 void ControlUI::onAiDetectionChanged(bool checked) {
     emit aiDetectionToggled(checked);
+}
+
+void ControlUI::onDemoModeChanged(bool checked) {
+    if (demoStatusLabel) {
+        demoStatusLabel->setText(checked ? "Starting local demo traffic..." : "Stopping local demo traffic...");
+    }
+    emit demoModeRequested(checked);
 }

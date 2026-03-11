@@ -32,6 +32,7 @@ signals:
     void denoiseChanged(int value);
     void receiverSettingsRequested(const QString &address, quint16 port);
     void aiDetectionToggled(bool enabled);
+    void demoModeRequested(bool enabled);
 
 public slots:
     void onRecordingStateChanged(bool recording);
@@ -40,6 +41,7 @@ public slots:
     void onReceiverStatusChanged(const QString &statusText);
     void onReceiverSettingsChanged(const QString &address, quint16 port);
     void onAiStatusChanged(const QString &statusText);
+    void onDemoStateChanged(bool enabled, const QString &statusText);
 
 private slots:
     void onBrightnessChanged(int value);
@@ -53,6 +55,7 @@ private slots:
     void onFlipVerticalChanged(bool checked);
     void onApplyReceiverSettings();
     void onAiDetectionChanged(bool checked);
+    void onDemoModeChanged(bool checked);
 
 private:
     QWidget *createImagePage();
@@ -98,6 +101,8 @@ private:
     QSpinBox *portSpinBox;
     QLabel *receiverStatusLabel;
     QPushButton *applyReceiverButton;
+    QCheckBox *demoModeCheckBox;
+    QLabel *demoStatusLabel;
 
     QCheckBox *aiEnableCheckBox;
     QLabel *aiStatusLabel;

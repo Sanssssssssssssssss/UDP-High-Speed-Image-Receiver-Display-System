@@ -130,6 +130,7 @@ private:
     QElapsedTimer cadenceTimer;
     qint64 nextFrameDeadlineNs;
 };
+
 }
 
 int runApplication(int argc, char *argv[]) {
@@ -242,17 +243,51 @@ int runApplication(int argc, char *argv[]) {
     controlUI->setFixedWidth(560);
     mainLayout->addWidget(controlUI);
 
-    if (enableDemo) {
-        QThread *demoThread = new QThread(&mainWidget);
-        LocalDemoSender *demoSender = new LocalDemoSender();
+    QThread *demoThread = nullptr;
+    LocalDemoSender *demoSender = nullptr;
+    bool demoEnabled = false;
+    const QString demoEnabledText = "Local demo is active at 60 fps and about 24k UDP packets per second.";
+    const QString demoDisabledText = "Local demo is disabled.";
+
+    const auto updateDemoUi = [&](bool enabled, const QString &statusText) {
+        controlUI->onDemoStateChanged(enabled, statusText);
+        modeBadge->setText(enabled ? "LOOPBACK DEMO" : "HARDWARE INPUT");
+        videoSubtitle->setText(enabled
+                                   ? "Local demo traffic is active at 60 fps and about 24k UDP packets per second for stress testing."
+                                   : "Hardware input mode is active. Start the built-in demo from the Network page when you want protocol-compatible local UDP stress traffic.");
+    };
+
+    const auto stopDemo = [&]() {
+        if (demoSender != nullptr) {
+            QMetaObject::invokeMethod(demoSender, [demoSender]() { demoSender->stop(); }, Qt::BlockingQueuedConnection);
+        }
+
+        if (demoThread != nullptr) {
+            demoThread->quit();
+            demoThread->wait();
+        }
+
+        demoSender = nullptr;
+        demoThread = nullptr;
+        demoEnabled = false;
+        updateDemoUi(false, demoDisabledText);
+    };
+
+    const auto startDemo = [&]() {
+        if (demoEnabled) {
+            updateDemoUi(true, demoEnabledText);
+            return;
+        }
+
+        demoThread = new QThread(&mainWidget);
+        demoSender = new LocalDemoSender();
         demoSender->moveToThread(demoThread);
         QObject::connect(demoThread, &QThread::started, demoSender, [demoSender]() { demoSender->start(); });
-        QObject::connect(&app, &QCoreApplication::aboutToQuit, demoSender, [demoSender]() { demoSender->stop(); });
-        QObject::connect(&app, &QCoreApplication::aboutToQuit, demoThread, &QThread::quit);
         QObject::connect(demoThread, &QThread::finished, demoSender, &QObject::deleteLater);
-        QObject::connect(demoThread, &QThread::finished, demoThread, &QObject::deleteLater);
         demoThread->start();
-    }
+        demoEnabled = true;
+        updateDemoUi(true, demoEnabledText);
+    };
 
     QObject::connect(videoDisplay, &UdpFrameProcessor::fpsChanged, controlUI, &ControlUI::onFPSChanged);
     QObject::connect(videoDisplay, &UdpFrameProcessor::performanceStatsChanged, controlUI, &ControlUI::onPerformanceStatsChanged);
@@ -273,9 +308,22 @@ int runApplication(int argc, char *argv[]) {
     QObject::connect(videoDisplay, &UdpFrameProcessor::receiverStatusChanged, controlUI, &ControlUI::onReceiverStatusChanged);
     QObject::connect(videoDisplay, &UdpFrameProcessor::receiverSettingsChanged, controlUI, &ControlUI::onReceiverSettingsChanged);
     QObject::connect(videoDisplay, &UdpFrameProcessor::aiStatusChanged, controlUI, &ControlUI::onAiStatusChanged);
+    QObject::connect(controlUI, &ControlUI::demoModeRequested, &mainWidget, [&](bool enabled) {
+        if (enabled) {
+            startDemo();
+        } else {
+            stopDemo();
+        }
+    });
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &mainWidget, [&]() { stopDemo(); });
 
     controlUI->onReceiverSettingsChanged("0.0.0.0", 8080);
     controlUI->onAiStatusChanged("AI detection is disabled.");
+    updateDemoUi(false, demoDisabledText);
+
+    if (enableDemo) {
+        startDemo();
+    }
 
     mainWidget.setLayout(mainLayout);
     mainWidget.show();

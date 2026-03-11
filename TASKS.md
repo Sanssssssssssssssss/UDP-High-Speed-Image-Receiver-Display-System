@@ -15,6 +15,7 @@
 - [ ] Replace AI placeholder control with a verified model-backed inference path once the runtime/model location is defined.
 - [ ] Benchmark and optimize RGB565 -> RGB888 conversion further with SIMD if LUT is not sufficient.
 - [ ] Investigate residual real-hardware smoothness issues after decoupling parse FPS and present FPS.
+- [ ] Validate the new in-app demo toggle against the real hardware path and confirm it does not contaminate baseline measurements when disabled.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -63,6 +64,8 @@
 - [x] Replace per-line `QByteArray` frame storage with a contiguous frame buffer to reduce allocations and interpolation overhead.
 - [x] Increase receiver batch size to cut cross-thread signal churn under high packet rates.
 - [x] Move the built-in demo sender off the GUI thread so local stress testing does not self-throttle the UI path as heavily.
+- [x] Add a Network-page toggle that starts and stops the built-in protocol-compatible local UDP demo without restarting the app.
+- [x] Add separate VS Code hardware-mode and demo-mode launch entries so the app can be started without a manual PowerShell command.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.
