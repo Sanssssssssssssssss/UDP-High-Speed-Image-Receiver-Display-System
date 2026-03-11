@@ -48,6 +48,8 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
       droppedPacketsThisSecond(0),
       droppedBatchesThisSecond(0),
       maxQueuedPacketsThisSecond(0),
+      drainNsThisSecond(0),
+      maxDrainNsThisSecond(0),
       startMarkersThisSecond(0),
       endMarkersThisSecond(0),
       startWithoutEndThisSecond(0),
@@ -245,12 +247,16 @@ void UdpFrameProcessor::updateFPS() {
     const double avgInterpolationMs = completedFramesThisSecond > 0
         ? static_cast<double>(interpolationNsThisSecond) / static_cast<double>(completedFramesThisSecond) / 1000000.0
         : 0.0;
-    const QString finalStatsText = QString("Perf: pkts/s=%1 | parse fps=%2 | present fps=%3 | frame=%4 ms | interp=%5 ms | recovered lines/s=%6\nmarkers start/end=%7/%8 | start-no-end=%9 | end-no-start=%10 | orphan=%11 | overflow=%12 | short-end=%13 | resync=%14\nqueue dropped pkts/s=%15 | queue max=%16/%17")
+    const double drainMsThisSecond = static_cast<double>(drainNsThisSecond) / 1000000.0;
+    const double maxDrainMs = static_cast<double>(maxDrainNsThisSecond) / 1000000.0;
+    const QString finalStatsText = QString("Perf: pkts/s=%1 | parse fps=%2 | present fps=%3 | frame=%4 ms | interp=%5 ms | drain=%6 ms/s | drain max=%7 ms | recovered lines/s=%8\nmarkers start/end=%9/%10 | start-no-end=%11 | end-no-start=%12 | orphan=%13 | overflow=%14 | short-end=%15 | resync=%16\nqueue dropped pkts/s=%17 | queue max=%18/%19")
                                   .arg(datagramsThisSecond)
                                   .arg(frameCount)
                                   .arg(presentedFrameCount)
                                   .arg(avgFrameMs, 0, 'f', 3)
                                   .arg(avgInterpolationMs, 0, 'f', 3)
+                                  .arg(drainMsThisSecond, 0, 'f', 3)
+                                  .arg(maxDrainMs, 0, 'f', 3)
                                   .arg(recoveredLinesThisSecond)
                                   .arg(startMarkersThisSecond)
                                   .arg(endMarkersThisSecond)
@@ -275,6 +281,8 @@ void UdpFrameProcessor::updateFPS() {
     droppedPacketsThisSecond = 0;
     droppedBatchesThisSecond = 0;
     maxQueuedPacketsThisSecond = 0;
+    drainNsThisSecond = 0;
+    maxDrainNsThisSecond = 0;
     startMarkersThisSecond = 0;
     endMarkersThisSecond = 0;
     startWithoutEndThisSecond = 0;
@@ -339,6 +347,9 @@ void UdpFrameProcessor::enqueueFrameBatch(const QList<QByteArray> &batch) {
 }
 
 void UdpFrameProcessor::drainPendingBatches() {
+    QElapsedTimer drainTimer;
+    drainTimer.start();
+
     while (true) {
         QList<QByteArray> batch;
         bool needResync = false;
@@ -346,7 +357,7 @@ void UdpFrameProcessor::drainPendingBatches() {
             QMutexLocker lock(&pendingBatchMutex);
             if (pendingBatches.isEmpty()) {
                 drainScheduled = false;
-                return;
+                break;
             }
 
             batch = pendingBatches.dequeue();
@@ -367,6 +378,10 @@ void UdpFrameProcessor::drainPendingBatches() {
             processFrameData(*it);
         }
     }
+
+    const quint64 elapsedNs = static_cast<quint64>(drainTimer.nsecsElapsed());
+    drainNsThisSecond += elapsedNs;
+    maxDrainNsThisSecond = std::max(maxDrainNsThisSecond, elapsedNs);
 }
 
 void UdpFrameProcessor::onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message) {

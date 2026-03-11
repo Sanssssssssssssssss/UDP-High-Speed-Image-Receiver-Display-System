@@ -84,6 +84,8 @@ private:
     quint64 droppedPacketsThisSecond;
     quint64 droppedBatchesThisSecond;
     quint64 maxQueuedPacketsThisSecond;
+    quint64 drainNsThisSecond;
+    quint64 maxDrainNsThisSecond;
     quint64 startMarkersThisSecond;
     quint64 endMarkersThisSecond;
     quint64 startWithoutEndThisSecond;

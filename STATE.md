@@ -23,6 +23,7 @@
 - Frame assembly no longer stores each received line in a separate `QByteArray`; it now uses a contiguous frame buffer with direct interpolation/copy logic to reduce hot-path allocations.
 - Receiver-side batch size has been increased so high-rate UDP bursts spend less time on repeated batch signal emission.
 - A portable package and zip are now produced under `dist/`, and the packaged `newudp.exe` has passed a direct launch smoke test.
+- The performance stats now expose receiver-drain busy time and max drain time per second so GUI-thread starvation can be distinguished from pure link-side packet loss.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
@@ -47,6 +48,7 @@
 - The exact external UDP protocol definition is not yet documented in-repo.
 - Hardware dependency may slow validation unless a local simulator/replay path is built early.
 - The current code likely contains avoidable copies and thread-handoff overhead in the hot path, but this still needs measurement.
+- The strongest remaining software-side risk is that packet draining, frame assembly, and QWidget-driven presentation are still too tightly coupled around the GUI thread path.
 - If the external traffic truly depends on NIC promiscuous/mirror mode rather than normal host-addressed UDP delivery, Qt's normal UDP socket path may still be constrained by system/network configuration.
 - The build now depends on a project-local toolchain path inside this repository, so moving the repository will require refreshing the environment variables or relying on the detection script.
 - Recording behavior has compile-time and startup smoke coverage now, but it still needs a manual output-file validation pass.
