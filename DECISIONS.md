@@ -173,3 +173,27 @@
 - Date: 2026-03-11
 - Decision: provide separate VS Code launch/task entries for hardware-input mode and built-in demo mode instead of requiring ad hoc command-line arguments.
 - Reason: the user wants a direct editor-driven run flow and should not need to remember or type `--demo` manually each time.
+
+## D-030 Keep a dedicated optimization change log in-repo
+- Status: Accepted
+- Date: 2026-03-12
+- Decision: record receiver, rendering, recording, and future YOLO optimization steps in a dedicated `OPTIMIZATION_LOG.md` file that explicitly states what logic changed from what previous logic.
+- Reason: the user wants a durable engineering log of hot-path changes beyond the normal state/decision/task summaries.
+
+## D-031 Keep UI responsibility limited to final frame presentation
+- Status: Accepted
+- Date: 2026-03-12
+- Decision: move packet draining, frame reconstruction, local image processing, and recording away from the `QWidget` class into dedicated worker objects, leaving UI paint code responsible only for presenting the final frame.
+- Reason: lower latency now matters more than keeping all responsibilities on one class, and the prior structure was still too tightly coupled to the GUI path.
+
+## D-032 Use OpenMP and SIMD selectively on pure pixel hot paths
+- Status: Accepted
+- Date: 2026-03-12
+- Decision: use OpenMP only on independent row-level loops and use SIMD first on byte-wise interpolation logic, while avoiding these techniques inside Qt GUI operations or high-level OpenCV DNN calls.
+- Reason: this matches the low-latency goal without creating extra contention or unstable behavior in UI-bound code.
+
+## D-033 Move recording onto a dedicated bounded writer path
+- Status: Accepted
+- Date: 2026-03-12
+- Decision: record final frames through a dedicated `VideoRecorderWorker` thread with a bounded queue instead of writing video from the live processing hot path.
+- Reason: synchronous encoding work was directly increasing end-to-end latency and could stall live display under load.

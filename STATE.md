@@ -27,6 +27,10 @@
 - The built-in demo sender now runs on its own worker thread instead of sharing the main GUI thread, making local software-path stress tests less self-throttling.
 - The Network page now includes a built-in demo toggle so protocol-compatible local UDP traffic can be started or stopped from inside the running app.
 - VS Code now exposes separate hardware-mode and demo-mode launch entries so the app can be started without opening PowerShell manually.
+- The receive/reconstruct/render path has now been split so `UdpFrameProcessor` acts as a presentation-only widget while a dedicated pipeline worker owns packet draining, frame reconstruction, local image tuning, and final-frame generation off the UI thread.
+- Recording now runs through a dedicated writer worker with a bounded queue instead of encoding directly on the live processing path.
+- An `OPTIMIZATION_LOG.md` file now tracks exactly which hot-path logic changed from which previous logic, including future YOLO optimization history.
+- OpenMP is now enabled for row-level hot loops and SSE2 is used for missing-line interpolation inside the worker-side pipeline.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
@@ -43,7 +47,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate the in-app demo toggle and the updated VS Code launch flow against the latest real-hardware measurements, then continue reducing residual startup stutter and decide how the AI page should connect to a real model/runtime path.
+- Validate the worker-thread render refactor and the new async recording path against real-hardware measurements, then benchmark the remaining residual latency and decide how the AI page should connect to a real model/runtime path.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.
@@ -57,6 +61,7 @@
 - Recording behavior has compile-time and startup smoke coverage now, but it still needs a manual output-file validation pass.
 - Runtime network rebinding is now available, but it still needs hardware-path validation on the actual UDP source to confirm it behaves correctly under real traffic.
 - The portable package path is now working on this machine, but it still needs verification on a second Windows machine to confirm no hidden local dependency remains.
+- The new worker-thread render architecture has startup coverage now, but it still needs real-hardware latency validation and recording-file verification under load.
 
 ## Handoff Notes
 - Start each new session by reading `PROJECT_BRIEF.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `TASKS.md`, and `STATE.md`.

@@ -16,6 +16,8 @@
 - [ ] Benchmark and optimize RGB565 -> RGB888 conversion further with SIMD if LUT is not sufficient.
 - [ ] Investigate residual real-hardware smoothness issues after decoupling parse FPS and present FPS.
 - [ ] Validate the new in-app demo toggle against the real hardware path and confirm it does not contaminate baseline measurements when disabled.
+- [ ] Benchmark the new worker-thread render architecture on the real hardware path and quantify remaining end-to-end latency.
+- [ ] Manually validate the new async recording output path under sustained load.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -66,6 +68,10 @@
 - [x] Move the built-in demo sender off the GUI thread so local stress testing does not self-throttle the UI path as heavily.
 - [x] Add a Network-page toggle that starts and stops the built-in protocol-compatible local UDP demo without restarting the app.
 - [x] Add separate VS Code hardware-mode and demo-mode launch entries so the app can be started without a manual PowerShell command.
+- [x] Add `OPTIMIZATION_LOG.md` to record hot-path logic changes and future YOLO optimization history.
+- [x] Refactor the render pipeline so UI paint is limited to presenting the final frame while a worker thread owns packet draining, frame reconstruction, and local image tuning.
+- [x] Move live recording off the frame-processing hot path into a dedicated writer worker with a bounded queue.
+- [x] Add OpenMP row-level parallelism and SSE2 line interpolation to the pure pixel hot paths.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

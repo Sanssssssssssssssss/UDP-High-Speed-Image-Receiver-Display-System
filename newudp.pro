@@ -3,6 +3,8 @@ QT += core gui widgets concurrent network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++11
+win32-g++: QMAKE_CXXFLAGS += -fopenmp
+win32-g++: LIBS += -fopenmp
 
 DEFINES += QT_DEPRECATED_WARNINGS
 
@@ -10,13 +12,17 @@ SOURCES += \
     main.cpp \
     src/app/ApplicationLauncher.cpp \
     src/network/UdpReceiver.cpp \
+    src/processing/UdpFramePipelineWorker.cpp \
     src/processing/UdpFrameProcessor.cpp \
+    src/processing/VideoRecorderWorker.cpp \
     src/ui/ControlUI.cpp
 
 HEADERS += \
     include/app/ApplicationLauncher.h \
     include/network/UdpReceiver.h \
+    include/processing/UdpFramePipelineWorker.h \
     include/processing/UdpFrameProcessor.h \
+    include/processing/VideoRecorderWorker.h \
     include/ui/ControlUI.h
 
 qnx: target.path = /tmp/$${TARGET}/bin

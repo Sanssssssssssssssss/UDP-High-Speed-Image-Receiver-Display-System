@@ -1,23 +1,13 @@
 #ifndef UDP_FRAME_PROCESSOR_H
 #define UDP_FRAME_PROCESSOR_H
 
-#include "UdpReceiver.h"
-#include <QDateTime>
-#include <QDir>
-#include <QElapsedTimer>
-#include <QQueue>
-#include <QByteArray>
 #include <QImage>
-#include <QList>
-#include <QMetaObject>
 #include <QMutex>
-#include <QMutexLocker>
-#include <QPainter>
 #include <QThread>
 #include <QTimer>
-#include <QVector>
 #include <QWidget>
-#include <opencv2/opencv.hpp>
+
+class UdpFramePipelineWorker;
 
 class UdpFrameProcessor : public QWidget {
     Q_OBJECT
@@ -25,8 +15,6 @@ class UdpFrameProcessor : public QWidget {
 public:
     explicit UdpFrameProcessor(QWidget *parent = nullptr);
     ~UdpFrameProcessor();
-
-    QImage getCurrentFrame();
 
 public slots:
     void saveSnapshot(const QString &directory);
@@ -52,74 +40,49 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private slots:
-    void updateFPS();
-    void enqueueFrameBatch(const QList<QByteArray> &batch);
-    void drainPendingBatches();
-    void onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message);
     void presentLatestFrame();
+    void onWorkerFrameReady(const QImage &frame);
+    void onWorkerStatsReady(const QString &statsText);
 
 private:
-    static bool isMarkerPacket(const QByteArray &data, char marker);
-    void processFrameData(const QByteArray &data);
-    void finalizeFrame();
-    void writeFrameToVideo();
-    void refreshDisplayImage();
-    void applyProcessing(const cv::Mat &sourceRgb, cv::Mat &destRgb) const;
-    QImage buildOutputFrame(const QImage &sourceFrame) const;
-    void resetParserState();
+    void invokeWorkerVoid(const char *method);
+    template <typename Arg1>
+    void invokeWorkerUnary(const char *method, const Arg1 &arg1);
+    template <typename Arg1, typename Arg2>
+    void invokeWorkerBinary(const char *method, const Arg1 &arg1, const Arg2 &arg2);
+    template <typename Arg1, typename Arg2, typename Arg3>
+    void invokeWorkerTernary(const char *method, const Arg1 &arg1, const Arg2 &arg2, const Arg3 &arg3);
 
-    QImage rawImage;
-    QImage displayImage;
-    QMutex imageMutex;
-
-    QTimer *fpsTimer;
+    QThread *workerThread;
+    UdpFramePipelineWorker *worker;
     QTimer *presentTimer;
-    int frameCount;
-    int presentedFrameCount;
-    quint64 datagramsThisSecond;
-    quint64 completedFramesThisSecond;
-    quint64 recoveredLinesThisSecond;
-    quint64 frameProcessingNsThisSecond;
-    quint64 interpolationNsThisSecond;
-    quint64 droppedPacketsThisSecond;
-    quint64 droppedBatchesThisSecond;
-    quint64 maxQueuedPacketsThisSecond;
-    quint64 drainNsThisSecond;
-    quint64 maxDrainNsThisSecond;
-    quint64 startMarkersThisSecond;
-    quint64 endMarkersThisSecond;
-    quint64 startWithoutEndThisSecond;
-    quint64 endWithoutStartThisSecond;
-    quint64 orphanLinePacketsThisSecond;
-    quint64 overflowLinePacketsThisSecond;
-    quint64 shortFrameEndsThisSecond;
-    quint64 parserResyncEventsThisSecond;
-    int currentLine;
-    bool frameValid;
-    QByteArray frameData;
-    QVector<int> linePayloadSizes;
-    QVector<bool> receivedLineFlags;
-    QQueue<QList<QByteArray> > pendingBatches;
-    QMutex pendingBatchMutex;
-    int pendingPacketCount;
-    bool drainScheduled;
-    bool parserResyncPending;
 
-    UdpReceiver *receiver;
-    QThread *receiverThread;
-
-    bool flipHorizontal;
-    bool flipVertical;
-    int brightnessValue;
-    int gammaValue;
-    int sharpnessValue;
-    int denoiseValue;
-    QString receiverAddress;
-    quint16 receiverPort;
-    bool aiDetectionEnabled;
-    cv::VideoWriter videoWriter;
-    bool isRecording;
+    QImage pendingFrame;
+    QImage presentedFrame;
+    QMutex frameMutex;
     bool framePendingPresentation;
+    int presentedFrameCount;
+    QString latestWorkerStats;
 };
+
+template <typename Arg1>
+void UdpFrameProcessor::invokeWorkerUnary(const char *method, const Arg1 &arg1) {
+    QMetaObject::invokeMethod(worker, method, Qt::QueuedConnection, Q_ARG(Arg1, arg1));
+}
+
+template <typename Arg1, typename Arg2>
+void UdpFrameProcessor::invokeWorkerBinary(const char *method, const Arg1 &arg1, const Arg2 &arg2) {
+    QMetaObject::invokeMethod(worker, method, Qt::QueuedConnection, Q_ARG(Arg1, arg1), Q_ARG(Arg2, arg2));
+}
+
+template <typename Arg1, typename Arg2, typename Arg3>
+void UdpFrameProcessor::invokeWorkerTernary(const char *method, const Arg1 &arg1, const Arg2 &arg2, const Arg3 &arg3) {
+    QMetaObject::invokeMethod(worker,
+                              method,
+                              Qt::QueuedConnection,
+                              Q_ARG(Arg1, arg1),
+                              Q_ARG(Arg2, arg2),
+                              Q_ARG(Arg3, arg3));
+}
 
 #endif // UDP_FRAME_PROCESSOR_H
