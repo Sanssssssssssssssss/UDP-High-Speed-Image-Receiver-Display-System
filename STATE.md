@@ -31,6 +31,9 @@
 - Recording now runs through a dedicated writer worker with a bounded queue instead of encoding directly on the live processing path.
 - An `OPTIMIZATION_LOG.md` file now tracks exactly which hot-path logic changed from which previous logic, including future YOLO optimization history.
 - OpenMP is now enabled for row-level hot loops and SSE2 is used for missing-line interpolation inside the worker-side pipeline.
+- Flip and image-tuning control delivery now uses explicit typed queued signal-slot forwarding into the worker thread instead of string-based runtime dispatch.
+- The live performance text now also shows the worker's active `flip` and image-tuning parameters so control-path regressions can be diagnosed from the UI.
+- The Windows deploy script now copies `libgomp-1.dll`, fixing direct launches of the OpenMP-enabled executable.
 - The UDP receiver no longer periodically discards pending datagrams, now requests a larger socket receive buffer, and batches packet delivery from the socket thread into the frame processor.
 - The built-in loopback demo now targets 60 fps and roughly 24k UDP packets per second, matching the intended stress level more closely.
 - The processor-side ingress queue is now explicitly bounded to 6 frame-equivalents (2412 packets); beyond that, the oldest pending batches are dropped and the parser forces a resync on the next frame marker.
@@ -47,7 +50,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate the worker-thread render refactor and the new async recording path against real-hardware measurements, then benchmark the remaining residual latency and decide how the AI page should connect to a real model/runtime path.
+- Validate that `flip` and image-tuning controls now change both the image and the worker-side stats on the real running UI, then continue benchmarking residual receive/display latency on the hardware path.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.

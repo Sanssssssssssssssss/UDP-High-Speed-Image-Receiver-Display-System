@@ -20,6 +20,17 @@ UdpFrameProcessor::UdpFrameProcessor(QWidget *parent)
     connect(workerThread, &QThread::started, worker, &UdpFramePipelineWorker::start);
     connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
 
+    connect(this, &UdpFrameProcessor::saveSnapshotRequested, worker, &UdpFramePipelineWorker::saveSnapshot, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::toggleRecordingRequested, worker, &UdpFramePipelineWorker::toggleRecording, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::flipHorizontalRequested, worker, &UdpFramePipelineWorker::setFlipHorizontal, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::flipVerticalRequested, worker, &UdpFramePipelineWorker::setFlipVertical, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::brightnessRequested, worker, &UdpFramePipelineWorker::setBrightness, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::gammaRequested, worker, &UdpFramePipelineWorker::setGamma, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::sharpnessRequested, worker, &UdpFramePipelineWorker::setSharpness, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::denoiseRequested, worker, &UdpFramePipelineWorker::setDenoise, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::receiverSettingsApplyRequested, worker, &UdpFramePipelineWorker::applyReceiverSettings, Qt::QueuedConnection);
+    connect(this, &UdpFrameProcessor::aiDetectionRequested, worker, &UdpFramePipelineWorker::setAiDetectionEnabled, Qt::QueuedConnection);
+
     connect(worker, &UdpFramePipelineWorker::frameReady, this, &UdpFrameProcessor::onWorkerFrameReady, Qt::QueuedConnection);
     connect(worker, &UdpFramePipelineWorker::statsReady, this, &UdpFrameProcessor::onWorkerStatsReady, Qt::QueuedConnection);
     connect(worker, &UdpFramePipelineWorker::recordingStateChanged, this, &UdpFrameProcessor::recordingStateChanged, Qt::QueuedConnection);
@@ -40,48 +51,44 @@ UdpFrameProcessor::~UdpFrameProcessor() {
     workerThread->wait();
 }
 
-void UdpFrameProcessor::invokeWorkerVoid(const char *method) {
-    QMetaObject::invokeMethod(worker, method, Qt::QueuedConnection);
-}
-
 void UdpFrameProcessor::saveSnapshot(const QString &directory) {
-    invokeWorkerUnary("saveSnapshot", directory);
+    emit saveSnapshotRequested(directory);
 }
 
 void UdpFrameProcessor::toggleRecording(const QString &directory, const QString &format, int fps) {
-    invokeWorkerTernary("toggleRecording", directory, format, fps);
+    emit toggleRecordingRequested(directory, format, fps);
 }
 
 void UdpFrameProcessor::setFlipHorizontal(bool enabled) {
-    invokeWorkerUnary("setFlipHorizontal", enabled);
+    emit flipHorizontalRequested(enabled);
 }
 
 void UdpFrameProcessor::setFlipVertical(bool enabled) {
-    invokeWorkerUnary("setFlipVertical", enabled);
+    emit flipVerticalRequested(enabled);
 }
 
 void UdpFrameProcessor::setBrightness(int value) {
-    invokeWorkerUnary("setBrightness", value);
+    emit brightnessRequested(value);
 }
 
 void UdpFrameProcessor::setGamma(int value) {
-    invokeWorkerUnary("setGamma", value);
+    emit gammaRequested(value);
 }
 
 void UdpFrameProcessor::setSharpness(int value) {
-    invokeWorkerUnary("setSharpness", value);
+    emit sharpnessRequested(value);
 }
 
 void UdpFrameProcessor::setDenoise(int value) {
-    invokeWorkerUnary("setDenoise", value);
+    emit denoiseRequested(value);
 }
 
 void UdpFrameProcessor::applyReceiverSettings(const QString &address, quint16 port) {
-    invokeWorkerBinary("applyReceiverSettings", address, port);
+    emit receiverSettingsApplyRequested(address, port);
 }
 
 void UdpFrameProcessor::setAiDetectionEnabled(bool enabled) {
-    invokeWorkerUnary("setAiDetectionEnabled", enabled);
+    emit aiDetectionRequested(enabled);
 }
 
 void UdpFrameProcessor::paintEvent(QPaintEvent *event) {

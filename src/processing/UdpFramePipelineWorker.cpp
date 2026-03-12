@@ -314,7 +314,7 @@ void UdpFramePipelineWorker::updateStats() {
         : 0.0;
     const double drainMsThisSecond = static_cast<double>(drainNsThisSecond) / 1000000.0;
     const double maxDrainMs = static_cast<double>(maxDrainNsThisSecond) / 1000000.0;
-    const QString statsText = QString("Perf: pkts/s=%1 | parse fps=%2 | frame=%3 ms | interp=%4 ms | drain=%5 ms/s | drain max=%6 ms | recovered lines/s=%7\nmarkers start/end=%8/%9 | start-no-end=%10 | end-no-start=%11 | orphan=%12 | overflow=%13 | short-end=%14 | resync=%15\nqueue cur=%16 | dropped pkts/s=%17 | dropped batches/s=%18 | queue max=%19/%20")
+    const QString statsText = QString("Perf: pkts/s=%1 | parse fps=%2 | frame=%3 ms | interp=%4 ms | drain=%5 ms/s | drain max=%6 ms | recovered lines/s=%7\nmarkers start/end=%8/%9 | start-no-end=%10 | end-no-start=%11 | orphan=%12 | overflow=%13 | short-end=%14 | resync=%15\nqueue cur=%16 | dropped pkts/s=%17 | dropped batches/s=%18 | queue max=%19/%20\nproc flipH=%21 | flipV=%22 | bright=%23 | gamma=%24 | sharp=%25 | denoise=%26")
                                   .arg(datagramsThisSecond)
                                   .arg(completedFramesThisSecond)
                                   .arg(avgFrameMs, 0, 'f', 3)
@@ -334,7 +334,13 @@ void UdpFramePipelineWorker::updateStats() {
                                   .arg(droppedPacketsThisSecond)
                                   .arg(droppedBatchesThisSecond)
                                   .arg(maxQueuedPacketsThisSecond)
-                                  .arg(kMaxQueuedPackets);
+                                  .arg(kMaxQueuedPackets)
+                                  .arg(flipHorizontal ? 1 : 0)
+                                  .arg(flipVertical ? 1 : 0)
+                                  .arg(brightnessValue)
+                                  .arg(gammaValue)
+                                  .arg(sharpnessValue)
+                                  .arg(denoiseValue);
     emit statsReady(statsText);
 
     datagramsThisSecond = 0;

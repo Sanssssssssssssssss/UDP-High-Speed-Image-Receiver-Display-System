@@ -18,6 +18,7 @@
 - [ ] Validate the new in-app demo toggle against the real hardware path and confirm it does not contaminate baseline measurements when disabled.
 - [ ] Benchmark the new worker-thread render architecture on the real hardware path and quantify remaining end-to-end latency.
 - [ ] Manually validate the new async recording output path under sustained load.
+- [ ] Validate on the live UI that worker-side `flip` and image-tuning stats track user input exactly under load.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -72,6 +73,9 @@
 - [x] Refactor the render pipeline so UI paint is limited to presenting the final frame while a worker thread owns packet draining, frame reconstruction, and local image tuning.
 - [x] Move live recording off the frame-processing hot path into a dedicated writer worker with a bounded queue.
 - [x] Add OpenMP row-level parallelism and SSE2 line interpolation to the pure pixel hot paths.
+- [x] Replace brittle string-based worker control forwarding with typed queued signal-slot forwarding for flip and image-tuning controls.
+- [x] Add worker-side processing state to the live debug stats so control-path regressions are visible in the UI.
+- [x] Fix OpenMP runtime DLL deployment so the built executable can launch directly after `-fopenmp` is enabled.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

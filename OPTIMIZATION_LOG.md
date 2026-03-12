@@ -12,6 +12,27 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 
 ## Entries
 
+### 2026-03-12 - Typed control forwarding for worker-side image controls
+- Area: UI control -> worker pipeline
+- Before: `UdpFrameProcessor` forwarded flip, tuning, capture, and AI control changes with string-based `QMetaObject::invokeMethod(...)`, which became brittle after the worker-thread refactor and left `flip` / `image tuning` effectively dead on the active path.
+- After: `UdpFrameProcessor` now exposes explicit typed request signals and connects them directly to `UdpFramePipelineWorker` slots with queued signal-slot connections.
+- Expected Effect: flip and image-tuning changes reliably reach the worker thread and immediately trigger recomposition of the final display frame.
+- Validation: build succeeds; worker-side stats now expose the active processing parameters so runtime changes can be verified from the UI.
+
+### 2026-03-12 - Worker-side processing state added to live debug stats
+- Area: Runtime diagnostics
+- Before: the stats panel exposed packet, queue, and parser information, but not whether the worker had actually received the latest flip/tuning state.
+- After: the stats text now includes `flipH`, `flipV`, `bright`, `gamma`, `sharp`, and `denoise` as the worker currently sees them.
+- Expected Effect: control-path regressions become directly visible without needing to infer them only from the image.
+- Validation: move a slider or toggle flip and confirm the stats values change on the next update.
+
+### 2026-03-12 - OpenMP runtime DLL deployment fix
+- Area: Windows runtime packaging
+- Before: the build/deploy flow copied Qt, OpenCV, and core MinGW DLLs, but missed `libgomp-1.dll`, so direct launches of the OpenMP-enabled executable could fail with a DLL-not-found exit.
+- After: the deployment script now copies `libgomp-1.dll` into the output directory alongside the other MinGW runtime DLLs.
+- Expected Effect: direct `exe` launches stay compatible after enabling OpenMP.
+- Validation: `build-vscode/debug/newudp.exe --demo` remains running after launch instead of exiting with `0xC0000135`.
+
 ### 2026-03-12 - Low-latency render architecture refactor
 - Area: Receive -> reconstruct -> display
 - Before: `UdpFrameProcessor` mixed packet draining, frame reconstruction, image processing, recording, and `QWidget` painting on the same object, with heavy work still coupled to the UI thread path.

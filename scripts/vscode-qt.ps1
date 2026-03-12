@@ -227,6 +227,7 @@ function Invoke-DeployRuntime {
 
     $mingwDlls = @(
         "libgcc_s_seh-1.dll",
+        "libgomp-1.dll",
         "libstdc++-6.dll",
         "libwinpthread-1.dll"
     )

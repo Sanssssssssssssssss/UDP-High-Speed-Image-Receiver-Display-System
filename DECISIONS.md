@@ -197,3 +197,9 @@
 - Date: 2026-03-12
 - Decision: record final frames through a dedicated `VideoRecorderWorker` thread with a bounded queue instead of writing video from the live processing hot path.
 - Reason: synchronous encoding work was directly increasing end-to-end latency and could stall live display under load.
+
+## D-034 Use typed queued signal-slot forwarding for worker-side controls
+- Status: Accepted
+- Date: 2026-03-12
+- Decision: forward flip, image-tuning, capture, receiver-settings, and AI-control changes from `UdpFrameProcessor` to `UdpFramePipelineWorker` through explicit typed Qt signals connected with queued signal-slot connections, instead of string-based `QMetaObject::invokeMethod(...)`.
+- Reason: after the worker-thread render refactor, the control path must remain compile-time checked and reliably bound to the worker thread; the string-based forwarding layer was too brittle and obscured failures.

@@ -35,6 +35,16 @@ signals:
     void receiverStatusChanged(const QString &statusText);
     void receiverSettingsChanged(const QString &address, quint16 port);
     void aiStatusChanged(const QString &statusText);
+    void saveSnapshotRequested(const QString &directory);
+    void toggleRecordingRequested(const QString &directory, const QString &format, int fps);
+    void flipHorizontalRequested(bool enabled);
+    void flipVerticalRequested(bool enabled);
+    void brightnessRequested(int value);
+    void gammaRequested(int value);
+    void sharpnessRequested(int value);
+    void denoiseRequested(int value);
+    void receiverSettingsApplyRequested(const QString &address, quint16 port);
+    void aiDetectionRequested(bool enabled);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -45,14 +55,6 @@ private slots:
     void onWorkerStatsReady(const QString &statsText);
 
 private:
-    void invokeWorkerVoid(const char *method);
-    template <typename Arg1>
-    void invokeWorkerUnary(const char *method, const Arg1 &arg1);
-    template <typename Arg1, typename Arg2>
-    void invokeWorkerBinary(const char *method, const Arg1 &arg1, const Arg2 &arg2);
-    template <typename Arg1, typename Arg2, typename Arg3>
-    void invokeWorkerTernary(const char *method, const Arg1 &arg1, const Arg2 &arg2, const Arg3 &arg3);
-
     QThread *workerThread;
     UdpFramePipelineWorker *worker;
     QTimer *presentTimer;
@@ -64,25 +66,5 @@ private:
     int presentedFrameCount;
     QString latestWorkerStats;
 };
-
-template <typename Arg1>
-void UdpFrameProcessor::invokeWorkerUnary(const char *method, const Arg1 &arg1) {
-    QMetaObject::invokeMethod(worker, method, Qt::QueuedConnection, Q_ARG(Arg1, arg1));
-}
-
-template <typename Arg1, typename Arg2>
-void UdpFrameProcessor::invokeWorkerBinary(const char *method, const Arg1 &arg1, const Arg2 &arg2) {
-    QMetaObject::invokeMethod(worker, method, Qt::QueuedConnection, Q_ARG(Arg1, arg1), Q_ARG(Arg2, arg2));
-}
-
-template <typename Arg1, typename Arg2, typename Arg3>
-void UdpFrameProcessor::invokeWorkerTernary(const char *method, const Arg1 &arg1, const Arg2 &arg2, const Arg3 &arg3) {
-    QMetaObject::invokeMethod(worker,
-                              method,
-                              Qt::QueuedConnection,
-                              Q_ARG(Arg1, arg1),
-                              Q_ARG(Arg2, arg2),
-                              Q_ARG(Arg3, arg3));
-}
 
 #endif // UDP_FRAME_PROCESSOR_H
