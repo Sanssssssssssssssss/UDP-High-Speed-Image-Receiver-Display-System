@@ -68,6 +68,13 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: compatible Windows machines can pick up hardware acceleration automatically, while CPU fallback also gets a stronger baseline.
 - Validation: helper startup now reports the active provider in its ready JSON, and the current machine cleanly selects `CPUExecutionProvider` because no faster compatible provider is installed.
 
+### 2026-03-19 - DirectML provider enabled on the local Intel Arc machine
+- Area: AI inference backend
+- Before: the local helper only exposed `CPUExecutionProvider`, so even after transport-path optimization inference still ran on CPU.
+- After: the repo-local Python environment now includes `onnxruntime-directml`, and the helper automatically upgrades to `DmlExecutionProvider` on this machine.
+- Expected Effect: materially lower inference latency without changing decode semantics, model input size, or the app-side mailbox logic.
+- Validation: provider discovery now reports `['DmlExecutionProvider', 'CPUExecutionProvider']`, helper startup reports `provider=DmlExecutionProvider`, and the same local synthetic test dropped from roughly `101 ms` to roughly `14 ms`.
+
 ### 2026-03-19 - One extra deep frame copy removed before inference dispatch
 - Area: AI ingress
 - Before: the latest-frame mailbox copied the already-copied `QImage` one more time when `submitFrame()` ran.

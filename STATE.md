@@ -49,6 +49,7 @@
 - The built-in demo sender now also supports an exact pixel-by-pixel reference-image mode through `assets/demo_reference.*`; when no asset is present it falls back to the procedural scene.
 - The provided `best.onnx` does not load through OpenCV 3.4.8 DNN on this machine, so the current working AI path uses a repo-local Python `onnxruntime` helper while preserving the previously verified YOLO box decode semantics.
 - The current Python ONNX helper now uses raw RGB24 frame transport instead of PNG round-trips, reports the active runtime provider, and prefers the fastest available `onnxruntime` provider before falling back to an optimized CPU session.
+- The local Python ONNX environment now exposes `DmlExecutionProvider` on the Intel Arc GPU, so the helper is no longer CPU-only on this machine.
 
 ## Current Understanding
 - This is a Windows-oriented Qt Widgets UDP image receiver that reconstructs RGB565 line data into a displayed frame.
@@ -56,7 +57,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate on the running UI that the accelerated AI path still produces sensible detections on both the pulsing demo scene and the real hardware scene, then tune thresholds/input handling or provider strategy if the model shape/confidence behavior still needs adjustment.
+- Validate on the running UI that the DirectML-accelerated AI path still produces sensible detections on both the pulsing demo scene and the real hardware scene, then tune thresholds/input handling if the model shape/confidence behavior still needs adjustment.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.
@@ -72,6 +73,7 @@
 - The portable package path is now working on this machine, but it still needs verification on a second Windows machine to confirm no hidden local dependency remains.
 - The new worker-thread render architecture has startup coverage now, but it still needs real-hardware latency validation and recording-file verification under load.
 - The current AI compatibility path depends on a repo-local Python helper, so packaged "any machine" deployment is not yet solved for this exact ONNX model/toolchain combination.
+- The new DirectML acceleration is machine-dependent; a different Windows host may still fall back to CPU if it lacks a compatible GPU/runtime stack.
 
 ## Handoff Notes
 - Start each new session by reading `PROJECT_BRIEF.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `TASKS.md`, and `STATE.md`.

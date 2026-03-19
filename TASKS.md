@@ -24,6 +24,7 @@
 - [ ] Decide whether to upgrade the native inference runtime so `best.onnx` can run without the current repo-local Python compatibility helper.
 - [ ] Add the exact reference image asset under `assets/demo_reference.*` so the built-in UDP demo matches the real target scene pixel-by-pixel.
 - [ ] Benchmark real-scene end-to-end AI latency after the new raw-RGB helper transport and provider-selection changes.
+- [ ] Decide whether to keep the current Python+DirectML path as the near-term deployment target or replace it with a native C++ ONNX Runtime integration.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -87,6 +88,7 @@
 - [x] Change the local UDP demo scene to a stable pulsing target-like image that is more useful for AI validation.
 - [x] Remove PNG round-trips from the Python ONNX helper path and replace them with raw RGB24 transport.
 - [x] Teach the Python ONNX helper to report and prefer the fastest available execution provider while keeping a tuned CPU fallback.
+- [x] Enable `onnxruntime-directml` on the local Intel Arc machine so the helper can use `DmlExecutionProvider` instead of CPU-only inference.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.
