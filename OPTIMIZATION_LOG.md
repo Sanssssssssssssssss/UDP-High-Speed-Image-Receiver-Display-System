@@ -12,6 +12,20 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 
 ## Entries
 
+### 2026-03-19 - ONNX YOLO path integrated into the worker architecture
+- Area: AI inference
+- Before: the active build exposed only an AI placeholder toggle; the old `YoloProcessor` was not wired into the live worker/display pipeline and depended on a hardcoded external ONNX path.
+- After: the app now builds `YoloProcessor`, loads a packaged `models/best.onnx`, runs inference on a dedicated thread with a latest-frame mailbox, and overlays returned detection rectangles onto the final display frame.
+- Expected Effect: AI can be turned on from the current UI without stalling the UDP receive path, and packaged builds keep the model with the executable.
+- Validation: build succeeds with `opencv_dnn`; demo-mode and hardware-mode launches remain stable; AI page reports model-ready status.
+
+### 2026-03-19 - Demo scene changed from abstract bars to a pulsing target image
+- Area: Local UDP demo
+- Before: the built-in demo generated colorful synthetic motion that was good for receive stress, but poor for validating whether YOLO was actually seeing the intended object class.
+- After: the demo now emits a darker target-like scene with a bright pulsing foreground and structured dark region, so visibility oscillates while packet semantics stay unchanged.
+- Expected Effect: local demo traffic becomes more useful for validating AI activation and detection behavior, not only receive throughput.
+- Validation: demo-mode launch remains stable and the displayed scene visibly pulses instead of only sweeping with bars.
+
 ### 2026-03-12 - Typed control forwarding for worker-side image controls
 - Area: UI control -> worker pipeline
 - Before: `UdpFrameProcessor` forwarded flip, tuning, capture, and AI control changes with string-based `QMetaObject::invokeMethod(...)`, which became brittle after the worker-thread refactor and left `flip` / `image tuning` effectively dead on the active path.

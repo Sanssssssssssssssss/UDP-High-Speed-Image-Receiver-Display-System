@@ -11,6 +11,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     main.cpp \
     src/app/ApplicationLauncher.cpp \
+    src/inference/YoloProcessor.cpp \
     src/network/UdpReceiver.cpp \
     src/processing/UdpFramePipelineWorker.cpp \
     src/processing/UdpFrameProcessor.cpp \
@@ -19,6 +20,7 @@ SOURCES += \
 
 HEADERS += \
     include/app/ApplicationLauncher.h \
+    include/inference/YoloProcessor.h \
     include/network/UdpReceiver.h \
     include/processing/UdpFramePipelineWorker.h \
     include/processing/UdpFrameProcessor.h \
@@ -46,6 +48,7 @@ INCLUDEPATH += $$OPENCV_ROOT/include
 
 LIBS += -L$$OPENCV_ROOT/x64/mingw/lib
 LIBS += -lopencv_core348 \
+        -lopencv_dnn348 \
         -lopencv_imgproc348 \
         -lopencv_highgui348 \
         -lopencv_imgcodecs348 \

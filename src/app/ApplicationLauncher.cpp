@@ -34,6 +34,7 @@ record video.
 #include <QUdpSocket>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <cmath>
 
 namespace {
 const qint64 kDemoFrameIntervalNs = 1000000000LL / 60LL;
@@ -84,11 +85,46 @@ private:
         datagram[2] = static_cast<char>((line >> 8) & 0xFF);
         datagram[3] = static_cast<char>(line & 0xFF);
 
+        const double pulse = 0.52 + (0.42 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.19))));
+        const double shimmer = 0.88 + (0.12 * std::sin(static_cast<double>(frameIndex) * 0.41));
         for (int x = 0; x < 400; ++x) {
-            const int movingBar = (x + frameIndex * 4) % 400;
-            const int r = (x + frameIndex * 3) & 0xFF;
-            const int g = (line * 2 + frameIndex * 5) & 0xFF;
-            const int b = ((movingBar ^ line) * 3) & 0xFF;
+            const double nx = (static_cast<double>(x) - 200.0) / 200.0;
+            const double ny = (static_cast<double>(line) - 200.0) / 200.0;
+            double luminance = 14.0;
+
+            const double lowerGlow = ((nx * nx) / 0.88) + (((ny - 0.78) * (ny - 0.78)) / 0.10);
+            if (lowerGlow < 1.0) {
+                luminance += 210.0 * pulse * (1.0 - lowerGlow);
+            }
+
+            const double upperBlob = (((nx + 0.28) * (nx + 0.28)) / 0.06) + (((ny - 0.18) * (ny - 0.18)) / 0.08);
+            if (upperBlob < 1.0) {
+                luminance += 165.0 * pulse * shimmer * (1.0 - upperBlob);
+            }
+
+            const double middleBody = (((nx - 0.02) * (nx - 0.02)) / 0.22) + (((ny - 0.05) * (ny - 0.05)) / 0.12);
+            if (middleBody < 1.0) {
+                luminance += 85.0 * pulse * (1.0 - middleBody);
+            }
+
+            const double darkSlot = (((nx - 0.18) * (nx - 0.18)) / 0.14) + (((ny - 0.18) * (ny - 0.18)) / 0.05);
+            if (darkSlot < 1.0) {
+                luminance -= 95.0 * (1.0 - darkSlot);
+            }
+
+            if (x > 210 && x < 310 && line > 180 && line < 285 && ((line / 12) % 2 == 0)) {
+                luminance -= 22.0;
+            }
+
+            const int sparkle = ((x * 17) ^ (line * 29) ^ (frameIndex * 7)) & 0x3F;
+            if (sparkle == 3 || sparkle == 11) {
+                luminance += 28.0 * pulse;
+            }
+
+            luminance = std::max(0.0, std::min(255.0, luminance));
+            const int r = static_cast<int>(std::min(255.0, luminance * 0.96));
+            const int g = static_cast<int>(std::min(255.0, luminance));
+            const int b = static_cast<int>(std::min(255.0, luminance * 0.42));
             const quint16 rgb565 = packRgb565(r, g, b);
             datagram[4 + (x * 2)] = static_cast<char>((rgb565 >> 8) & 0xFF);
             datagram[4 + (x * 2) + 1] = static_cast<char>(rgb565 & 0xFF);
@@ -216,7 +252,7 @@ int runApplication(int argc, char *argv[]) {
     videoHeaderTextLayout->addWidget(videoTitle);
 
     const QString subtitleText = enableDemo
-        ? "Local demo traffic is active at 60 fps and about 24k UDP packets per second for stress testing."
+        ? "Local demo traffic is active at 60 fps with a pulsing target scene, so receive stability and AI detection can be checked together."
         : "Hardware input mode is active. Start with --demo or POST_TRAIN_DEMO=1 when you want the built-in UDP stress source.";
     auto *videoSubtitle = new QLabel(subtitleText, videoPanel);
     videoSubtitle->setObjectName("VideoSubtitle");
@@ -246,14 +282,14 @@ int runApplication(int argc, char *argv[]) {
     QThread *demoThread = nullptr;
     LocalDemoSender *demoSender = nullptr;
     bool demoEnabled = false;
-    const QString demoEnabledText = "Local demo is active at 60 fps and about 24k UDP packets per second.";
+    const QString demoEnabledText = "Local demo is active at 60 fps with a pulsing target scene for receive and AI validation.";
     const QString demoDisabledText = "Local demo is disabled.";
 
     const auto updateDemoUi = [&](bool enabled, const QString &statusText) {
         controlUI->onDemoStateChanged(enabled, statusText);
         modeBadge->setText(enabled ? "LOOPBACK DEMO" : "HARDWARE INPUT");
         videoSubtitle->setText(enabled
-                                   ? "Local demo traffic is active at 60 fps and about 24k UDP packets per second for stress testing."
+                                   ? "Local demo traffic is active at 60 fps with a pulsing target scene, so receive stability and AI detection can be checked together."
                                    : "Hardware input mode is active. Start the built-in demo from the Network page when you want protocol-compatible local UDP stress traffic.");
     };
 

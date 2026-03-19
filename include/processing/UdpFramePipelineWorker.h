@@ -3,6 +3,7 @@
 
 #include "UdpReceiver.h"
 #include "VideoRecorderWorker.h"
+#include "YoloProcessor.h"
 #include <QByteArray>
 #include <QImage>
 #include <QMutex>
@@ -49,6 +50,8 @@ private slots:
     void enqueueFrameBatch(const QList<QByteArray> &batch);
     void drainPendingBatches();
     void onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message);
+    void onYoloDetectionsReady(const QVector<QRect> &boxes, int inferenceMs);
+    void onYoloStatusChanged(const QString &statusText);
 
 private:
     static constexpr int kFrameWidth = 400;
@@ -63,9 +66,11 @@ private:
     void resetParserState(bool clearPendingQueue);
     void processFrameData(const QByteArray &data);
     void finalizeFrame();
-    void composeDisplayFrame();
+    void composeDisplayFrame(bool submitAiFrame = true);
     void copyRawToDisplay(QImage &dest);
     void flipImageInPlace(QImage &image) const;
+    void drawDetections(QImage &image) const;
+    QRect transformDetectionRect(const QRect &rect) const;
     void refreshDisplayFromRaw();
     void rebuildToneLutIfNeeded();
     void applyProcessing(const cv::Mat &sourceRgb, cv::Mat &destRgb);
@@ -73,6 +78,9 @@ private:
 
     UdpReceiver *receiver;
     QThread *receiverThread;
+
+    YoloProcessor *yoloProcessor;
+    QThread *yoloThread;
 
     VideoRecorderWorker *recorderWorker;
     QThread *recorderThread;
@@ -91,6 +99,9 @@ private:
     QString receiverAddress;
     quint16 receiverPort;
     bool aiDetectionEnabled;
+    QString aiStatusText;
+    int lastInferenceMs;
+    QVector<QRect> latestDetections;
     bool isRecording;
 
     int currentLine;

@@ -1,8 +1,11 @@
 #include "UdpFramePipelineWorker.h"
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QMetaObject>
+#include <QPainter>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -39,12 +42,18 @@ const std::array<uchar, 64> kExpand6To8 = []() {
     }
     return table;
 }();
+
+QString resolvePackagedOnnxPath() {
+    return QDir(QCoreApplication::applicationDirPath()).filePath("models/best.onnx");
+}
 }
 
 UdpFramePipelineWorker::UdpFramePipelineWorker(QObject *parent)
     : QObject(parent),
       receiver(nullptr),
       receiverThread(nullptr),
+      yoloProcessor(nullptr),
+      yoloThread(nullptr),
       recorderWorker(nullptr),
       recorderThread(nullptr),
       statsTimer(nullptr),
@@ -58,6 +67,8 @@ UdpFramePipelineWorker::UdpFramePipelineWorker(QObject *parent)
       receiverAddress("0.0.0.0"),
       receiverPort(8080),
       aiDetectionEnabled(false),
+      aiStatusText("AI detection is disabled."),
+      lastInferenceMs(0),
       isRecording(false),
       currentLine(0),
       frameValid(false),
@@ -101,10 +112,25 @@ void UdpFramePipelineWorker::start() {
     qRegisterMetaType<QSize>("QSize");
     qRegisterMetaType<QList<QByteArray> >("QList<QByteArray>");
     qRegisterMetaType<quint16>("quint16");
+    qRegisterMetaType<QVector<QRect> >("QVector<QRect>");
+
+    const QString packagedModelPath = resolvePackagedOnnxPath();
+    aiStatusText = QFileInfo::exists(packagedModelPath)
+        ? QString("AI model ready: %1").arg(packagedModelPath)
+        : QString("AI model file missing: %1").arg(packagedModelPath);
 
     statsTimer = new QTimer(this);
     connect(statsTimer, &QTimer::timeout, this, &UdpFramePipelineWorker::updateStats);
     statsTimer->start(1000);
+
+    yoloProcessor = new YoloProcessor(packagedModelPath);
+    yoloThread = new QThread();
+    yoloProcessor->moveToThread(yoloThread);
+    connect(yoloThread, &QThread::finished, yoloProcessor, &QObject::deleteLater);
+    connect(yoloProcessor, &YoloProcessor::detectionsReady, this, &UdpFramePipelineWorker::onYoloDetectionsReady, Qt::QueuedConnection);
+    connect(yoloProcessor, &YoloProcessor::statusChanged, this, &UdpFramePipelineWorker::onYoloStatusChanged, Qt::QueuedConnection);
+    yoloThread->start();
+    QMetaObject::invokeMethod(yoloProcessor, "setEnabled", Qt::QueuedConnection, Q_ARG(bool, false));
 
     recorderWorker = new VideoRecorderWorker();
     recorderThread = new QThread();
@@ -129,7 +155,7 @@ void UdpFramePipelineWorker::start() {
     receiverThread->start();
 
     emit receiverSettingsChanged(receiverAddress, receiverPort);
-    emit aiStatusChanged("AI detection is disabled.");
+    emit aiStatusChanged(aiStatusText);
     emit frameReady(displayBuffers[frontDisplayIndex]);
 }
 
@@ -149,6 +175,13 @@ void UdpFramePipelineWorker::shutdown() {
         receiverThread->wait();
         receiverThread = nullptr;
         receiver = nullptr;
+    }
+
+    if (yoloThread != nullptr) {
+        yoloThread->quit();
+        yoloThread->wait();
+        yoloThread = nullptr;
+        yoloProcessor = nullptr;
     }
 
     if (recorderWorker != nullptr) {
@@ -276,6 +309,8 @@ void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint
     displayBuffers[0].fill(Qt::black);
     displayBuffers[1].fill(Qt::black);
     frontDisplayIndex = 0;
+    latestDetections.clear();
+    lastInferenceMs = 0;
 
     emit frameReady(displayBuffers[frontDisplayIndex]);
     emit receiverStatusChanged(QString("Rebinding receiver to %1:%2 ...").arg(receiverAddress).arg(receiverPort));
@@ -292,11 +327,36 @@ void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint
 
 void UdpFramePipelineWorker::setAiDetectionEnabled(bool enabled) {
     aiDetectionEnabled = enabled;
-    if (enabled) {
-        emit aiStatusChanged("AI detection armed. No model is configured yet, so inference stays idle.");
-    } else {
-        emit aiStatusChanged("AI detection is disabled.");
+    latestDetections.clear();
+    lastInferenceMs = 0;
+
+    if (yoloProcessor != nullptr) {
+        QMetaObject::invokeMethod(yoloProcessor, "setEnabled", Qt::QueuedConnection, Q_ARG(bool, enabled));
     }
+
+    if (!enabled) {
+        aiStatusText = "AI detection is disabled.";
+        emit aiStatusChanged(aiStatusText);
+        refreshDisplayFromRaw();
+    }
+}
+
+void UdpFramePipelineWorker::onYoloDetectionsReady(const QVector<QRect> &boxes, int inferenceMs) {
+    latestDetections = boxes;
+    lastInferenceMs = inferenceMs;
+
+    if (aiDetectionEnabled) {
+        aiStatusText = QString("AI detection active | detections=%1 | infer=%2 ms")
+                           .arg(latestDetections.size())
+                           .arg(lastInferenceMs);
+        emit aiStatusChanged(aiStatusText);
+        refreshDisplayFromRaw();
+    }
+}
+
+void UdpFramePipelineWorker::onYoloStatusChanged(const QString &statusText) {
+    aiStatusText = statusText;
+    emit aiStatusChanged(aiStatusText);
 }
 
 void UdpFramePipelineWorker::updateStats() {
@@ -314,7 +374,7 @@ void UdpFramePipelineWorker::updateStats() {
         : 0.0;
     const double drainMsThisSecond = static_cast<double>(drainNsThisSecond) / 1000000.0;
     const double maxDrainMs = static_cast<double>(maxDrainNsThisSecond) / 1000000.0;
-    const QString statsText = QString("Perf: pkts/s=%1 | parse fps=%2 | frame=%3 ms | interp=%4 ms | drain=%5 ms/s | drain max=%6 ms | recovered lines/s=%7\nmarkers start/end=%8/%9 | start-no-end=%10 | end-no-start=%11 | orphan=%12 | overflow=%13 | short-end=%14 | resync=%15\nqueue cur=%16 | dropped pkts/s=%17 | dropped batches/s=%18 | queue max=%19/%20\nproc flipH=%21 | flipV=%22 | bright=%23 | gamma=%24 | sharp=%25 | denoise=%26")
+    const QString statsText = QString("Perf: pkts/s=%1 | parse fps=%2 | frame=%3 ms | interp=%4 ms | drain=%5 ms/s | drain max=%6 ms | recovered lines/s=%7\nmarkers start/end=%8/%9 | start-no-end=%10 | end-no-start=%11 | orphan=%12 | overflow=%13 | short-end=%14 | resync=%15\nqueue cur=%16 | dropped pkts/s=%17 | dropped batches/s=%18 | queue max=%19/%20\nproc flipH=%21 | flipV=%22 | bright=%23 | gamma=%24 | sharp=%25 | denoise=%26\nai enabled=%27 | det=%28 | infer=%29 ms")
                                   .arg(datagramsThisSecond)
                                   .arg(completedFramesThisSecond)
                                   .arg(avgFrameMs, 0, 'f', 3)
@@ -340,7 +400,10 @@ void UdpFramePipelineWorker::updateStats() {
                                   .arg(brightnessValue)
                                   .arg(gammaValue)
                                   .arg(sharpnessValue)
-                                  .arg(denoiseValue);
+                                  .arg(denoiseValue)
+                                  .arg(aiDetectionEnabled ? 1 : 0)
+                                  .arg(latestDetections.size())
+                                  .arg(lastInferenceMs);
     emit statsReady(statsText);
 
     datagramsThisSecond = 0;
@@ -580,7 +643,7 @@ void UdpFramePipelineWorker::finalizeFrame() {
         }
     }
 
-    composeDisplayFrame();
+    composeDisplayFrame(true);
 
     ++completedFramesThisSecond;
     frameProcessingNsThisSecond += static_cast<quint64>(frameTimer.nsecsElapsed());
@@ -656,6 +719,33 @@ void UdpFramePipelineWorker::flipImageInPlace(QImage &image) const {
     }
 }
 
+QRect UdpFramePipelineWorker::transformDetectionRect(const QRect &rect) const {
+    QRect mapped = rect;
+    if (flipHorizontal) {
+        mapped.setX(kFrameWidth - rect.x() - rect.width());
+    }
+    if (flipVertical) {
+        mapped.setY(kFrameHeight - rect.y() - rect.height());
+    }
+    return mapped;
+}
+
+void UdpFramePipelineWorker::drawDetections(QImage &image) const {
+    if (!aiDetectionEnabled || latestDetections.isEmpty()) {
+        return;
+    }
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    QPen pen(QColor(255, 90, 50));
+    pen.setWidth(3);
+    painter.setPen(pen);
+
+    for (int i = 0; i < latestDetections.size(); ++i) {
+        painter.drawRect(transformDetectionRect(latestDetections[i]));
+    }
+}
+
 void UdpFramePipelineWorker::rebuildToneLutIfNeeded() {
     if (!lutDirty) {
         return;
@@ -693,7 +783,7 @@ void UdpFramePipelineWorker::applyProcessing(const cv::Mat &sourceRgb, cv::Mat &
     }
 }
 
-void UdpFramePipelineWorker::composeDisplayFrame() {
+void UdpFramePipelineWorker::composeDisplayFrame(bool submitAiFrame) {
     const int backIndex = 1 - frontDisplayIndex;
     QImage &backBuffer = displayBuffers[backIndex];
 
@@ -706,13 +796,22 @@ void UdpFramePipelineWorker::composeDisplayFrame() {
         flipImageInPlace(backBuffer);
     }
 
+    drawDetections(backBuffer);
+
     frontDisplayIndex = backIndex;
     emit frameReady(displayBuffers[frontDisplayIndex]);
     if (isRecording) {
         emit recordFrameReady(displayBuffers[frontDisplayIndex]);
     }
+
+    if (submitAiFrame && aiDetectionEnabled && yoloProcessor != nullptr) {
+        QMetaObject::invokeMethod(yoloProcessor,
+                                  "submitFrame",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(QImage, rawImage.copy()));
+    }
 }
 
 void UdpFramePipelineWorker::refreshDisplayFromRaw() {
-    composeDisplayFrame();
+    composeDisplayFrame(false);
 }

@@ -43,6 +43,9 @@
 - A `.vscode` workspace and `scripts/vscode-qt.ps1` toolchain script have been added for this machine.
 - A local Qt 5.15.2 + MinGW 8.1 + OpenCV 3.4.8 toolchain is now installed under `.local/toolchain`.
 - The project now builds successfully through the VS Code task flow, and the executable has passed a startup smoke test on this machine.
+- A packaged `models/best.onnx` model is now deployed with the executable, and the AI path is no longer placeholder-only.
+- AI inference now runs on a dedicated thread with a latest-frame mailbox, and returned detection boxes are overlaid on the final display frame.
+- The local UDP demo scene now uses a pulsing target-like image to help validate AI activation, not only packet receive stability.
 
 ## Current Understanding
 - This is a Windows-oriented Qt Widgets UDP image receiver that reconstructs RGB565 line data into a displayed frame.
@@ -50,7 +53,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate that `flip` and image-tuning controls now change both the image and the worker-side stats on the real running UI, then continue benchmarking residual receive/display latency on the hardware path.
+- Validate on the running UI that `best.onnx` produces sensible detections on both the pulsing demo scene and the real hardware scene, then tune thresholds/input handling if the model shape or confidence behavior needs adjustment.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.

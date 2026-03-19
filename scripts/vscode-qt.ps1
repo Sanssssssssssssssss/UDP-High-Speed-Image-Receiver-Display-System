@@ -214,6 +214,7 @@ function Invoke-DeployRuntime {
 
     $opencvDlls = @(
         "libopencv_core348.dll",
+        "libopencv_dnn348.dll",
         "libopencv_imgproc348.dll",
         "libopencv_highgui348.dll",
         "libopencv_imgcodecs348.dll",
@@ -234,6 +235,15 @@ function Invoke-DeployRuntime {
 
     foreach ($dll in $mingwDlls) {
         Copy-IfExists -Source (Join-Path $mingwBin $dll) -Destination $exeDir
+    }
+
+    $modelDir = Join-Path $workspace "models"
+    if (Test-Path $modelDir) {
+        $destModelDir = Join-Path $exeDir "models"
+        New-Item -ItemType Directory -Force -Path $destModelDir | Out-Null
+        Get-ChildItem -Path $modelDir -Filter *.onnx | ForEach-Object {
+            Copy-Item -Force $_.FullName $destModelDir
+        }
     }
 }
 
@@ -290,6 +300,11 @@ function Invoke-Package {
         }
     }
 
+    $modelDir = Join-Path $exeDir "models"
+    if (Test-Path $modelDir) {
+        Copy-Item -Recurse -Force $modelDir $packageDir
+    }
+
     $readme = @"
 Post-Train UDP Vision Console
 
@@ -299,7 +314,7 @@ Run:
 Demo mode:
   newudp.exe --demo
 
-This package already includes the required Qt, OpenCV, and MinGW runtime DLLs.
+This package already includes the required Qt, OpenCV, MinGW runtime DLLs, and ONNX model files.
 "@
     Set-Content -Path (Join-Path $packageDir "README.txt") -Value $readme -Encoding ASCII
 

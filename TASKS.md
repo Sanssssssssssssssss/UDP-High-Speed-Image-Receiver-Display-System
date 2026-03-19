@@ -19,6 +19,8 @@
 - [ ] Benchmark the new worker-thread render architecture on the real hardware path and quantify remaining end-to-end latency.
 - [ ] Manually validate the new async recording output path under sustained load.
 - [ ] Validate on the live UI that worker-side `flip` and image-tuning stats track user input exactly under load.
+- [ ] Validate ONNX detection quality on the real hardware scene and tune confidence/NMS/input-size settings if needed.
+- [ ] Decide whether AI model path should stay packaged-only or become operator-configurable from the AI page.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -76,6 +78,8 @@
 - [x] Replace brittle string-based worker control forwarding with typed queued signal-slot forwarding for flip and image-tuning controls.
 - [x] Add worker-side processing state to the live debug stats so control-path regressions are visible in the UI.
 - [x] Fix OpenMP runtime DLL deployment so the built executable can launch directly after `-fopenmp` is enabled.
+- [x] Integrate a packaged ONNX YOLO model into the active worker/display pipeline.
+- [x] Change the local UDP demo scene to a pulsing target-like image that is more useful for AI validation.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

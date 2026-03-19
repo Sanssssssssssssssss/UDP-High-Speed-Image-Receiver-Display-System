@@ -34,15 +34,21 @@
 - Keeps stream status pinned while exposing switchable subpages for image tuning, capture, network, and AI controls.
 - Emits adjustment signals for brightness/gamma/sharpness/denoise, flip state, runtime bind address/port changes, and AI enable state.
 
+### `YoloProcessor`
+- Owns ONNX model loading and CPU inference on a dedicated thread.
+- Accepts only the latest submitted frame and drops stale queued frames to avoid dragging the live receive/display path.
+- Emits detection rectangles and inference timing back to the pipeline worker for overlay and status reporting.
+
 ## 3. Current Data Flow
 1. `main.cpp` creates `UdpFrameProcessor` and `ControlUI`.
 2. `src/app/main.cpp` can optionally start a local UDP stress demo for startup verification.
 3. `UdpFrameProcessor` creates `UdpReceiver` on a worker thread.
 4. `UdpReceiver` binds the UDP socket and emits `newFrameBatch`.
-5. `UdpFramePipelineWorker` drains packet batches, reconstructs frames, performs local image processing, and emits a final display-ready `QImage`.
-6. `UdpFrameProcessor` receives the final frame and only paints it to the widget surface.
-7. `ControlUI` sends runtime tuning, capture, network, and AI requests into the pipeline worker through queued signals.
-8. Optional recording is handled by `VideoRecorderWorker` on a separate thread through a bounded frame queue.
+5. `UdpFramePipelineWorker` drains packet batches, reconstructs frames, performs local image processing, submits new raw frames to `YoloProcessor` when AI is enabled, and composes a final display-ready `QImage`.
+6. `YoloProcessor` runs ONNX inference on its own thread and returns the latest detection rectangles and inference timing.
+7. `UdpFrameProcessor` receives the final frame and only paints it to the widget surface.
+8. `ControlUI` sends runtime tuning, capture, network, and AI requests into the pipeline worker through queued signals.
+9. Optional recording is handled by `VideoRecorderWorker` on a separate thread through a bounded frame queue.
 
 ## 4. Architectural Constraints
 - Preserve the existing Qt Widgets baseline for the first milestone.
@@ -65,6 +71,7 @@
 - Isolate UDP protocol/frame parsing for easier testing.
 - Add a simulator or replay source for demo/testing without hardware.
 - Reduce environment-specific assumptions in build and runtime setup.
-- Keep inference-related code isolated from the live receive/display path until the baseline pipeline is stable and benchmarked.
+- Keep inference-related code isolated from the live receive/display path and fed through a mailbox/latest-frame policy so AI cannot build unbounded lag.
 - Keep demo traffic protocol-compatible with the receiver's existing frame-start, line-payload, and frame-end interpretation.
+- Keep packaged ONNX model assets deployable with the executable so AI validation survives moving to another Windows machine.
 - Keep a durable optimization log for hot-path changes and future YOLO optimization history.

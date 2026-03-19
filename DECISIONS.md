@@ -203,3 +203,15 @@
 - Date: 2026-03-12
 - Decision: forward flip, image-tuning, capture, receiver-settings, and AI-control changes from `UdpFrameProcessor` to `UdpFramePipelineWorker` through explicit typed Qt signals connected with queued signal-slot connections, instead of string-based `QMetaObject::invokeMethod(...)`.
 - Reason: after the worker-thread render refactor, the control path must remain compile-time checked and reliably bound to the worker thread; the string-based forwarding layer was too brittle and obscured failures.
+
+## D-035 Use packaged ONNX for the first real AI integration
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: integrate AI through a packaged `models/best.onnx` file loaded by OpenCV DNN, rather than requiring `.pt` export or Python at runtime.
+- Reason: the user already has an ONNX artifact, and this keeps runtime deployment inside the current Qt/OpenCV stack without adding a Python dependency to the shipped app.
+
+## D-036 Run YOLO inference on a dedicated latest-frame mailbox worker
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: feed AI only the latest completed frame and drop stale pending inference frames, while keeping inference on its own thread and returning only the newest detection rectangles for overlay.
+- Reason: this preserves the low-latency receive/display goal and avoids unbounded AI backlog under sustained 60 fps UDP traffic.

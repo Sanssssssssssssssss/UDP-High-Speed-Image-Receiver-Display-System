@@ -1,135 +1,192 @@
 #include "YoloProcessor.h"
-#include <QDebug>
 #include <QElapsedTimer>
-#include <QtConcurrent>
-#include <QBuffer>
-#include <QImageReader>
-#include <QDir>
+#include <QMetaObject>
+#include <QMutexLocker>
+#include <algorithm>
+#include <opencv2/imgproc.hpp>
 
-YoloProcessor::YoloProcessor(QObject *parent) : QObject(parent) {
-    net = cv::dnn::readNetFromONNX("D:/yolov8n_416.onnx");
-    net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-    net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-    frameBuffer = QImage(400, 400, QImage::Format_RGB888);
-    frameBuffer.fill(Qt::black);
+namespace {
+constexpr int kModelInputSize = 640;
+constexpr float kConfidenceThreshold = 0.35f;
+constexpr float kNmsThreshold = 0.45f;
 }
 
-void YoloProcessor::addPixel(int x, int y, uchar r, uchar g, uchar b) {
-    if (x >= 0 && x < frameBuffer.width() && y >= 0 && y < frameBuffer.height()) {
-        frameBuffer.setPixel(x, y, qRgb(r, g, b));
+YoloProcessor::YoloProcessor(const QString &modelPath, QObject *parent)
+    : QObject(parent),
+      enabled(false),
+      modelLoaded(false),
+      processing(false),
+      frameQueued(false) {
+    const bool loaded = loadModel(modelPath);
+    modelLoaded.store(loaded);
+    if (loaded) {
+        emit statusChanged(QString("AI model loaded: %1").arg(activeModelPath));
+    } else {
+        emit statusChanged(QString("AI model load failed: %1").arg(modelPath));
     }
 }
 
-void YoloProcessor::frameReady() {
-    // qDebug() << "[YOLO] frameReady() called!";
+bool YoloProcessor::loadModel(const QString &modelPath) {
+    try {
+        net = cv::dnn::readNetFromONNX(modelPath.toStdString());
+        net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+        net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+        activeModelPath = modelPath;
+        return true;
+    } catch (const cv::Exception &) {
+        activeModelPath.clear();
+        return false;
+    }
+}
 
-    if (processing.exchange(true)) {
-        qDebug() << "[YOLO] Already processing, skipping...";
+void YoloProcessor::setEnabled(bool enabledValue) {
+    enabled.store(enabledValue);
+    if (!enabledValue) {
+        emit detectionsReady(QVector<QRect>(), 0);
+        emit statusChanged(modelLoaded.load()
+                               ? "AI detection is disabled."
+                               : "AI detection is disabled. Model is not loaded.");
         return;
     }
 
-    QtConcurrent::run([this]() {
-        this->runInference();
-    });
+    emit statusChanged(modelLoaded.load()
+                           ? QString("AI detection is enabled. Model: %1").arg(activeModelPath)
+                           : "AI detection is enabled, but the ONNX model is not loaded.");
 }
 
-// yolo inference
-void YoloProcessor::runInference() {
-//    qDebug() << "[YOLO] runInference() STARTED!";
-//    qDebug() << "[YOLO] Running inference on thread:" << QThread::currentThread();
+void YoloProcessor::submitFrame(const QImage &frame) {
+    if (!enabled.load() || !modelLoaded.load() || frame.isNull()) {
+        return;
+    }
 
-    QImage localFrame;
     {
-        QMutexLocker lock(&bufferMutex);
-        localFrame = frameBuffer.copy();
+        QMutexLocker lock(&frameMutex);
+        latestFrame = frame.copy();
+        frameQueued = true;
     }
 
-    if (localFrame.isNull()) {
-//        qDebug() << "[YOLO] ERROR: FrameBuffer is null!";
-        processing = false;
-        return;
+    if (!processing.exchange(true)) {
+        QMetaObject::invokeMethod(this, "processLatestFrame", Qt::QueuedConnection);
+    }
+}
+
+void YoloProcessor::processLatestFrame() {
+    while (true) {
+        QImage frame;
+        {
+            QMutexLocker lock(&frameMutex);
+            if (!frameQueued) {
+                processing.store(false);
+                return;
+            }
+            frame = latestFrame;
+            frameQueued = false;
+        }
+
+        int inferenceMs = 0;
+        const QVector<QRect> boxes = runInference(frame, inferenceMs);
+        emit detectionsReady(boxes, inferenceMs);
+    }
+}
+
+QVector<QRect> YoloProcessor::runInference(const QImage &frame, int &inferenceMs) const {
+    QVector<QRect> detections;
+    if (frame.isNull()) {
+        inferenceMs = 0;
+        return detections;
     }
 
-    // **转换 QImage -> OpenCV Mat**
-    cv::Mat mat(localFrame.height(), localFrame.width(), CV_8UC3,
-                const_cast<uchar*>(localFrame.bits()), localFrame.bytesPerLine());
-
-    //  ** BGR -> RGB**
-    cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
+    cv::Mat rgb(frame.height(), frame.width(), CV_8UC3,
+                const_cast<uchar *>(frame.constBits()), frame.bytesPerLine());
+    cv::Mat bgr;
+    cv::cvtColor(rgb, bgr, cv::COLOR_RGB2BGR);
 
     cv::Mat blob;
-    cv::Size inputSize(416, 416);
-    cv::dnn::blobFromImage(mat, blob, 1 / 255.0, inputSize, cv::Scalar(), true, false);
+    cv::dnn::blobFromImage(bgr,
+                           blob,
+                           1.0 / 255.0,
+                           cv::Size(kModelInputSize, kModelInputSize),
+                           cv::Scalar(),
+                           true,
+                           false);
 
-    // qDebug() << "[YOLO] OpenCV blob size:" << blob.size;
+    QElapsedTimer timer;
+    timer.start();
 
-    net.setInput(blob);
+    cv::dnn::Net localNet = net;
+    localNet.setInput(blob);
     std::vector<cv::Mat> outputs;
-    net.forward(outputs);
+    localNet.forward(outputs, localNet.getUnconnectedOutLayersNames());
+    inferenceMs = static_cast<int>(timer.elapsed());
 
-    cv::Mat output = outputs[0].reshape(1, 5).t();  // (3549, 5)
+    if (outputs.empty()) {
+        return detections;
+    }
 
-    // qDebug() << "[YOLO] Inference completed. Parsing results...";
+    cv::Mat output = outputs[0];
+    cv::Mat parsed;
+
+    if (output.dims == 3) {
+        const int dim1 = output.size[1];
+        const int dim2 = output.size[2];
+        cv::Mat raw(dim1, dim2, CV_32F, output.ptr<float>());
+        if (dim1 < dim2) {
+            cv::transpose(raw, parsed);
+        } else {
+            parsed = raw;
+        }
+    } else if (output.dims == 2) {
+        parsed = output;
+    } else {
+        return detections;
+    }
+
+    if (parsed.empty() || parsed.cols < 5) {
+        return detections;
+    }
 
     std::vector<cv::Rect> boxes;
     std::vector<float> scores;
+    const float scaleX = static_cast<float>(frame.width()) / static_cast<float>(kModelInputSize);
+    const float scaleY = static_cast<float>(frame.height()) / static_cast<float>(kModelInputSize);
 
-    for (int i = 0; i < output.rows; i++) {
-        float* data = output.ptr<float>(i);  // 直接取出每一行数据
-        float cx = data[0];
-        float cy = data[1];
-        float w = data[2];
-        float h = data[3];
-        float score = data[4];
+    for (int row = 0; row < parsed.rows; ++row) {
+        const float *data = parsed.ptr<float>(row);
+        float confidence = 0.0f;
+        if (parsed.cols == 5) {
+            confidence = data[4];
+        } else {
+            confidence = *std::max_element(data + 4, data + parsed.cols);
+        }
 
-        if (score < 0.85) continue;
+        if (confidence < kConfidenceThreshold) {
+            continue;
+        }
 
-        int x1 = std::max(0, std::min(mat.cols, static_cast<int>(cx - w / 2)));
-        int y1 = std::max(0, std::min(mat.rows, static_cast<int>(cy - h / 2)));
-        int x2 = std::max(0, std::min(mat.cols, static_cast<int>(cx + w / 2)));
-        int y2 = std::max(0, std::min(mat.rows, static_cast<int>(cy + h / 2)));
+        const float cx = data[0] * scaleX;
+        const float cy = data[1] * scaleY;
+        const float w = data[2] * scaleX;
+        const float h = data[3] * scaleY;
 
-        boxes.push_back(cv::Rect(x1, y1, x2 - x1, y2 - y1));
-        scores.push_back(score);
+        const int x = std::max(0, static_cast<int>(cx - (w * 0.5f)));
+        const int y = std::max(0, static_cast<int>(cy - (h * 0.5f)));
+        const int width = std::min(frame.width() - x, static_cast<int>(w));
+        const int height = std::min(frame.height() - y, static_cast<int>(h));
+        if (width <= 0 || height <= 0) {
+            continue;
+        }
+
+        boxes.push_back(cv::Rect(x, y, width, height));
+        scores.push_back(confidence);
     }
 
-    std::vector<int> indices;
-    cv::dnn::NMSBoxes(boxes, scores, 0.3, 0.5, indices);
-
-    std::vector<QRect> detectedBoxes;
-//    qDebug() << "[YOLO] Raw Boxes Before NMS:";
-//    for (size_t i = 0; i < boxes.size(); i++) {
-//        qDebug() << "Box:" << boxes[i].x << boxes[i].y << boxes[i].width << boxes[i].height
-//                 << "Score:" << scores[i];
-//    }
-
-    for (int i : indices) {
-        int original_x = boxes[i].x;
-        int original_y = boxes[i].y;
-        int original_width = boxes[i].width;
-        int original_height = boxes[i].height;
-
-        int new_x = original_x * 2;
-        int new_y = original_y * 2;
-        int new_width = original_width * 2;
-        int new_height = original_height * 2;
-
-        detectedBoxes.push_back(QRect(new_x, new_y, new_width, new_height));
+    std::vector<int> kept;
+    cv::dnn::NMSBoxes(boxes, scores, kConfidenceThreshold, kNmsThreshold, kept);
+    detections.reserve(static_cast<int>(kept.size()));
+    for (size_t i = 0; i < kept.size(); ++i) {
+        const cv::Rect &box = boxes[static_cast<size_t>(kept[i])];
+        detections.push_back(QRect(box.x, box.y, box.width, box.height));
     }
 
-
-    qDebug() << "[YOLO] Detected" << detectedBoxes.size() << "objects";
-
-    emit detectionFinished(detectedBoxes);
-
-    processing = false;
-    // qDebug() << "[YOLO] Processing flag reset. Ready for next frame.";
+    return detections;
 }
-
-
-bool YoloProcessor::isProcessing() const {
-    bool status = processing.load();
-    // qDebug() << "[YOLO] isProcessing() called. Current status:" << status;
-    return status;
-}
-

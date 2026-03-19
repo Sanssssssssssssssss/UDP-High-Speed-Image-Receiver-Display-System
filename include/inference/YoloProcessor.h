@@ -1,40 +1,43 @@
-#ifndef YOLOPROCESSOR_H
-#define YOLOPROCESSOR_H
+#ifndef YOLO_PROCESSOR_H
+#define YOLO_PROCESSOR_H
 
-#include <QObject>
-#include <QThread>
 #include <QImage>
-#include <QByteArray>
-#include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
-#include <atomic>  
 #include <QMutex>
-#include <QElapsedTimer>
-#include <QtConcurrent>
-#include <QBuffer>
+#include <QObject>
+#include <QRect>
+#include <QVector>
+#include <atomic>
+#include <opencv2/dnn.hpp>
 
 class YoloProcessor : public QObject {
-Q_OBJECT
+    Q_OBJECT
 
 public:
-    explicit YoloProcessor(QObject *parent = nullptr);
-
-    bool isProcessing() const; 
+    explicit YoloProcessor(const QString &modelPath, QObject *parent = nullptr);
 
 public slots:
-    void runInference(); 
-    void addPixel(int x, int y, uchar r, uchar g, uchar b);  
-    void frameReady();  
+    void setEnabled(bool enabled);
+    void submitFrame(const QImage &frame);
 
 signals:
-    void detectionFinished(std::vector<QRect> boxes);  
+    void detectionsReady(const QVector<QRect> &boxes, int inferenceMs);
+    void statusChanged(const QString &statusText);
+
+private slots:
+    void processLatestFrame();
 
 private:
+    bool loadModel(const QString &modelPath);
+    QVector<QRect> runInference(const QImage &frame, int &inferenceMs) const;
+
     cv::dnn::Net net;
-    QImage frameBuffer;  
-    QByteArray lastFrameJpg;  
-    std::atomic<bool> processing{false};  
-    QMutex bufferMutex;
+    QString activeModelPath;
+    QMutex frameMutex;
+    QImage latestFrame;
+    std::atomic<bool> enabled;
+    std::atomic<bool> modelLoaded;
+    std::atomic<bool> processing;
+    bool frameQueued;
 };
 
-#endif // YOLOPROCESSOR_H
+#endif // YOLO_PROCESSOR_H
