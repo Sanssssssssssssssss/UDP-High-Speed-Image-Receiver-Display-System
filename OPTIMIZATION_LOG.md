@@ -19,12 +19,26 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: AI can be turned on from the current UI without stalling the UDP receive path, and packaged builds keep the model with the executable.
 - Validation: build succeeds with `opencv_dnn`; demo-mode and hardware-mode launches remain stable; AI page reports model-ready status.
 
+### 2026-03-19 - ONNX compatibility fallback and old decode semantics restored
+- Area: AI inference compatibility
+- Before: the active ONNX path assumed OpenCV 3.4.8 DNN could import the provided `best.onnx`, and once that failed the UI only surfaced an unusable "onnx not load" style failure.
+- After: `YoloProcessor` now tries OpenCV DNN first, then falls back to a repo-local Python `onnxruntime` helper. The helper uses the previously verified decode semantics: `416x416` input, `reshape(1, 5).t()` output view, confidence from the fifth scalar, and NMS thresholds `0.3 / 0.5`.
+- Expected Effect: AI activation works again on this machine without silently changing the user's known-good box decode logic.
+- Validation: helper init now succeeds against `models/best.onnx`, a request/response smoke test returns valid JSON, and the desktop app builds and launches in `--demo` mode.
+
 ### 2026-03-19 - Demo scene changed from abstract bars to a pulsing target image
 - Area: Local UDP demo
 - Before: the built-in demo generated colorful synthetic motion that was good for receive stress, but poor for validating whether YOLO was actually seeing the intended object class.
 - After: the demo now emits a darker target-like scene with a bright pulsing foreground and structured dark region, so visibility oscillates while packet semantics stay unchanged.
 - Expected Effect: local demo traffic becomes more useful for validating AI activation and detection behavior, not only receive throughput.
 - Validation: demo-mode launch remains stable and the displayed scene visibly pulses instead of only sweeping with bars.
+
+### 2026-03-19 - Demo scene corrected for stable AI validation
+- Area: Local UDP demo
+- Before: the first pulsing demo rewrite was still visually off-target and also injected periodic dropped lines, which made the scene unsuitable for validating AI or box stability.
+- After: the demo scene now stays frame-complete and renders a darker, green-biased target composition with bright foreground blobs, a structured dark cavity, and low-frequency brightness pulsing only.
+- Expected Effect: AI validation is no longer confounded by synthetic packet-loss artifacts or an obviously wrong test image.
+- Validation: the app launches in `--demo` mode after the change, and runtime screenshots show the scene structure instead of the previous abstract sweep.
 
 ### 2026-03-12 - Typed control forwarding for worker-side image controls
 - Area: UI control -> worker pipeline

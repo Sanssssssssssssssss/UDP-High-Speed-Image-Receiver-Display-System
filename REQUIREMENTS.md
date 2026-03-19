@@ -61,7 +61,7 @@
 
 ### FR-013 ONNX model-backed detection path
 - Status: Confirmed
-- The system shall support an ONNX-backed object detection path that can be enabled from the UI, runs without Python at runtime, and overlays detections on the displayed frame.
+- The system shall support an ONNX-backed object detection path that can be enabled from the UI and overlays detections on the displayed frame.
 - Reason: the user has provided an ONNX model and explicitly requested real integration, not only an AI placeholder.
 
 ## 3. Non-Functional Requirements
@@ -110,4 +110,4 @@
 - `main.cpp` and `UdpFrameProcessor.cpp` hardcode receive IP and port usage.
 - `UdpReceiver.cpp` hardcodes tshark executable path and capture output path.
 - `newudp.pro` hardcodes OpenCV include/lib paths to a local Windows installation.
-- `YoloProcessor` exists as a future inference path, but it is not wired into the active receive/display pipeline.
+- The provided `best.onnx` is not importable by the current OpenCV 3.4.8 DNN backend on this machine, so a validated fallback runtime path is required until the native backend/toolchain is upgraded.

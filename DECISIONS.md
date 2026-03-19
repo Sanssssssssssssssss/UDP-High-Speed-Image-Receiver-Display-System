@@ -207,11 +207,29 @@
 ## D-035 Use packaged ONNX for the first real AI integration
 - Status: Accepted
 - Date: 2026-03-19
-- Decision: integrate AI through a packaged `models/best.onnx` file loaded by OpenCV DNN, rather than requiring `.pt` export or Python at runtime.
-- Reason: the user already has an ONNX artifact, and this keeps runtime deployment inside the current Qt/OpenCV stack without adding a Python dependency to the shipped app.
+- Decision: integrate AI through a packaged `models/best.onnx` file, trying OpenCV DNN first but allowing an alternate runtime path when the provided model is incompatible with the current OpenCV 3.4.8 importer.
+- Reason: the user already has an ONNX artifact, but this exact model does not load natively through the current OpenCV DNN stack on this machine.
 
 ## D-036 Run YOLO inference on a dedicated latest-frame mailbox worker
 - Status: Accepted
 - Date: 2026-03-19
 - Decision: feed AI only the latest completed frame and drop stale pending inference frames, while keeping inference on its own thread and returning only the newest detection rectangles for overlay.
 - Reason: this preserves the low-latency receive/display goal and avoids unbounded AI backlog under sustained 60 fps UDP traffic.
+
+## D-037 Preserve the old verified YOLO box decode semantics
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: keep the YOLO decode path aligned with the previously verified logic: input size 416, output interpreted as `reshape(1, 5).t()`, confidence from the fifth scalar, and NMS thresholds of 0.3 / 0.5. Only the final box projection is adapted to the current 400x400 frame composition path.
+- Reason: the user explicitly confirmed that the previous decode semantics were correct and should not be changed casually.
+
+## D-038 Use a repo-local Python ONNX helper as the current compatibility fallback
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: when the packaged ONNX model cannot be imported by OpenCV 3.4.8 DNN, fall back to a repo-local Python helper backed by `onnxruntime`, while keeping the same box decode semantics and latest-frame mailbox policy.
+- Reason: this is the only currently validated runtime path for the provided `best.onnx` on this machine without pausing the project for a full OpenCV/runtime upgrade.
+
+## D-039 Keep the built-in demo visually aligned with the real target scene
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: the built-in UDP demo should prioritize a stable, dark-field, bright-target scene with gentle brightness pulsing over synthetic packet-loss tricks or abstract motion patterns.
+- Reason: the user wants the demo to validate AI activation and target perception, not only receive stress behavior.

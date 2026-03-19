@@ -21,6 +21,7 @@
 - [ ] Validate on the live UI that worker-side `flip` and image-tuning stats track user input exactly under load.
 - [ ] Validate ONNX detection quality on the real hardware scene and tune confidence/NMS/input-size settings if needed.
 - [ ] Decide whether AI model path should stay packaged-only or become operator-configurable from the AI page.
+- [ ] Decide whether to upgrade the native inference runtime so `best.onnx` can run without the current repo-local Python compatibility helper.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -79,7 +80,9 @@
 - [x] Add worker-side processing state to the live debug stats so control-path regressions are visible in the UI.
 - [x] Fix OpenMP runtime DLL deployment so the built executable can launch directly after `-fopenmp` is enabled.
 - [x] Integrate a packaged ONNX YOLO model into the active worker/display pipeline.
-- [x] Change the local UDP demo scene to a pulsing target-like image that is more useful for AI validation.
+- [x] Restore the previously verified YOLO decode semantics while adapting final box projection to the current frame composition path.
+- [x] Add a repo-local Python `onnxruntime` compatibility fallback for `best.onnx` when OpenCV 3.4.8 DNN cannot import it.
+- [x] Change the local UDP demo scene to a stable pulsing target-like image that is more useful for AI validation.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

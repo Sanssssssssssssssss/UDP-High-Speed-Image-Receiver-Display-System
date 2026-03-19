@@ -45,7 +45,8 @@
 - The project now builds successfully through the VS Code task flow, and the executable has passed a startup smoke test on this machine.
 - A packaged `models/best.onnx` model is now deployed with the executable, and the AI path is no longer placeholder-only.
 - AI inference now runs on a dedicated thread with a latest-frame mailbox, and returned detection boxes are overlaid on the final display frame.
-- The local UDP demo scene now uses a pulsing target-like image to help validate AI activation, not only packet receive stability.
+- The local UDP demo scene now uses a stable dark-field pulsing target-like image to help validate AI activation, not only packet receive stability.
+- The provided `best.onnx` does not load through OpenCV 3.4.8 DNN on this machine, so the current working AI path uses a repo-local Python `onnxruntime` helper while preserving the previously verified YOLO box decode semantics.
 
 ## Current Understanding
 - This is a Windows-oriented Qt Widgets UDP image receiver that reconstructs RGB565 line data into a displayed frame.
@@ -53,7 +54,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Validate on the running UI that `best.onnx` produces sensible detections on both the pulsing demo scene and the real hardware scene, then tune thresholds/input handling if the model shape or confidence behavior needs adjustment.
+- Validate on the running UI that the repaired AI path actually transitions from disabled to active and produces sensible detections on both the pulsing demo scene and the real hardware scene, then tune thresholds/input handling if the model shape or confidence behavior needs adjustment.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.
@@ -68,6 +69,7 @@
 - Runtime network rebinding is now available, but it still needs hardware-path validation on the actual UDP source to confirm it behaves correctly under real traffic.
 - The portable package path is now working on this machine, but it still needs verification on a second Windows machine to confirm no hidden local dependency remains.
 - The new worker-thread render architecture has startup coverage now, but it still needs real-hardware latency validation and recording-file verification under load.
+- The current AI compatibility path depends on a repo-local Python helper, so packaged "any machine" deployment is not yet solved for this exact ONNX model/toolchain combination.
 
 ## Handoff Notes
 - Start each new session by reading `PROJECT_BRIEF.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `TASKS.md`, and `STATE.md`.

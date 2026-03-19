@@ -69,6 +69,60 @@ private:
         return static_cast<quint16>((r5 << 11) | (g6 << 5) | b5);
     }
 
+    static double smoothEllipse(double x, double y, double cx, double cy, double rx, double ry) {
+        const double dx = (x - cx) / rx;
+        const double dy = (y - cy) / ry;
+        const double distance = (dx * dx) + (dy * dy);
+        if (distance >= 1.0) {
+            return 0.0;
+        }
+        return 1.0 - distance;
+    }
+
+    static double buildSceneLuminance(int x, int y, int frameIndex) {
+        const double nx = static_cast<double>(x) / 399.0;
+        const double ny = static_cast<double>(y) / 399.0;
+        const double pulse = 0.78 + (0.22 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.09))));
+        const double shimmer = 0.95 + (0.05 * std::sin((static_cast<double>(frameIndex) * 0.17) + (nx * 5.0)));
+
+        double luminance = 4.0;
+        luminance += 10.0 * (1.0 - ((ny - 0.18) * (ny - 0.18)));
+        luminance += 5.0 * std::sin((nx * 9.0) + (ny * 3.0));
+
+        const double lowerForeground = smoothEllipse(nx, ny, 0.55, 0.86, 0.39, 0.17);
+        luminance += 245.0 * lowerForeground * pulse;
+
+        const double upperCore = smoothEllipse(nx, ny, 0.30, 0.56, 0.13, 0.16);
+        const double upperHalo = smoothEllipse(nx, ny, 0.31, 0.58, 0.19, 0.22);
+        luminance += 170.0 * upperCore * pulse;
+        luminance += 55.0 * upperHalo * pulse;
+
+        const double bridgeGlow = smoothEllipse(nx, ny, 0.50, 0.60, 0.20, 0.12);
+        luminance += 70.0 * bridgeGlow * pulse;
+
+        const double darkCavity = smoothEllipse(nx, ny, 0.66, 0.63, 0.20, 0.11);
+        luminance -= 155.0 * darkCavity;
+
+        const double rightWall = smoothEllipse(nx, ny, 0.83, 0.64, 0.08, 0.18);
+        luminance += 36.0 * rightWall;
+
+        if (x > 208 && x < 315 && y > 182 && y < 302) {
+            const bool ridgeBand = (((y - 182) / 12) % 2) == 0;
+            if (ridgeBand) {
+                luminance += 18.0;
+            } else {
+                luminance -= 12.0;
+            }
+        }
+
+        const int speckle = ((x * 13) ^ (y * 29) ^ (frameIndex * 5)) & 0x7F;
+        if (speckle == 7 || speckle == 39) {
+            luminance += 14.0 * shimmer;
+        }
+
+        return std::max(0.0, std::min(255.0, luminance));
+    }
+
     QByteArray makeMarkerPacket(char marker) const {
         QByteArray datagram(4 + (400 * 2), marker);
         datagram[0] = 0x55;
@@ -85,46 +139,11 @@ private:
         datagram[2] = static_cast<char>((line >> 8) & 0xFF);
         datagram[3] = static_cast<char>(line & 0xFF);
 
-        const double pulse = 0.52 + (0.42 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.19))));
-        const double shimmer = 0.88 + (0.12 * std::sin(static_cast<double>(frameIndex) * 0.41));
         for (int x = 0; x < 400; ++x) {
-            const double nx = (static_cast<double>(x) - 200.0) / 200.0;
-            const double ny = (static_cast<double>(line) - 200.0) / 200.0;
-            double luminance = 14.0;
-
-            const double lowerGlow = ((nx * nx) / 0.88) + (((ny - 0.78) * (ny - 0.78)) / 0.10);
-            if (lowerGlow < 1.0) {
-                luminance += 210.0 * pulse * (1.0 - lowerGlow);
-            }
-
-            const double upperBlob = (((nx + 0.28) * (nx + 0.28)) / 0.06) + (((ny - 0.18) * (ny - 0.18)) / 0.08);
-            if (upperBlob < 1.0) {
-                luminance += 165.0 * pulse * shimmer * (1.0 - upperBlob);
-            }
-
-            const double middleBody = (((nx - 0.02) * (nx - 0.02)) / 0.22) + (((ny - 0.05) * (ny - 0.05)) / 0.12);
-            if (middleBody < 1.0) {
-                luminance += 85.0 * pulse * (1.0 - middleBody);
-            }
-
-            const double darkSlot = (((nx - 0.18) * (nx - 0.18)) / 0.14) + (((ny - 0.18) * (ny - 0.18)) / 0.05);
-            if (darkSlot < 1.0) {
-                luminance -= 95.0 * (1.0 - darkSlot);
-            }
-
-            if (x > 210 && x < 310 && line > 180 && line < 285 && ((line / 12) % 2 == 0)) {
-                luminance -= 22.0;
-            }
-
-            const int sparkle = ((x * 17) ^ (line * 29) ^ (frameIndex * 7)) & 0x3F;
-            if (sparkle == 3 || sparkle == 11) {
-                luminance += 28.0 * pulse;
-            }
-
-            luminance = std::max(0.0, std::min(255.0, luminance));
+            const double luminance = buildSceneLuminance(x, line, frameIndex);
             const int r = static_cast<int>(std::min(255.0, luminance * 0.96));
             const int g = static_cast<int>(std::min(255.0, luminance));
-            const int b = static_cast<int>(std::min(255.0, luminance * 0.42));
+            const int b = static_cast<int>(std::min(255.0, luminance * 0.34));
             const quint16 rgb565 = packRgb565(r, g, b);
             datagram[4 + (x * 2)] = static_cast<char>((rgb565 >> 8) & 0xFF);
             datagram[4 + (x * 2) + 1] = static_cast<char>(rgb565 & 0xFF);
@@ -136,11 +155,7 @@ private:
     void sendFrame() {
         socket->writeDatagram(makeMarkerPacket(char(0xAA)), QHostAddress::LocalHost, 8080);
 
-        const int droppedLine = (frameIndex % 45 == 0) ? ((frameIndex / 45) % 400) : -1;
         for (int line = 0; line < 400; ++line) {
-            if (line == droppedLine) {
-                continue;
-            }
             socket->writeDatagram(makeLinePacket(line), QHostAddress::LocalHost, 8080);
         }
 

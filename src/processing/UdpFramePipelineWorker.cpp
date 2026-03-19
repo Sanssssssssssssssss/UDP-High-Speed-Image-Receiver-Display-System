@@ -44,7 +44,23 @@ const std::array<uchar, 64> kExpand6To8 = []() {
 }();
 
 QString resolvePackagedOnnxPath() {
-    return QDir(QCoreApplication::applicationDirPath()).filePath("models/best.onnx");
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString currentDir = QDir::currentPath();
+    const QStringList candidates = QStringList()
+        << QDir(appDir).filePath("models/best.onnx")
+        << QDir(appDir).filePath("../models/best.onnx")
+        << QDir(appDir).filePath("../../models/best.onnx")
+        << QDir(appDir).filePath("../../../models/best.onnx")
+        << QDir(currentDir).filePath("models/best.onnx");
+
+    for (QStringList::const_iterator it = candidates.cbegin(); it != candidates.cend(); ++it) {
+        const QString cleaned = QDir::cleanPath(*it);
+        if (QFileInfo::exists(cleaned)) {
+            return cleaned;
+        }
+    }
+
+    return QDir(appDir).filePath("models/best.onnx");
 }
 }
 
@@ -130,6 +146,7 @@ void UdpFramePipelineWorker::start() {
     connect(yoloProcessor, &YoloProcessor::detectionsReady, this, &UdpFramePipelineWorker::onYoloDetectionsReady, Qt::QueuedConnection);
     connect(yoloProcessor, &YoloProcessor::statusChanged, this, &UdpFramePipelineWorker::onYoloStatusChanged, Qt::QueuedConnection);
     yoloThread->start();
+    QMetaObject::invokeMethod(yoloProcessor, "initialize", Qt::QueuedConnection);
     QMetaObject::invokeMethod(yoloProcessor, "setEnabled", Qt::QueuedConnection, Q_ARG(bool, false));
 
     recorderWorker = new VideoRecorderWorker();

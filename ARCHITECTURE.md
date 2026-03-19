@@ -36,6 +36,7 @@
 
 ### `YoloProcessor`
 - Owns ONNX model loading and CPU inference on a dedicated thread.
+- Tries the native OpenCV DNN backend first and falls back to a repo-local Python `onnxruntime` helper when the provided ONNX model is incompatible with the current OpenCV 3.4.8 importer.
 - Accepts only the latest submitted frame and drops stale queued frames to avoid dragging the live receive/display path.
 - Emits detection rectangles and inference timing back to the pipeline worker for overlay and status reporting.
 
@@ -45,7 +46,7 @@
 3. `UdpFrameProcessor` creates `UdpReceiver` on a worker thread.
 4. `UdpReceiver` binds the UDP socket and emits `newFrameBatch`.
 5. `UdpFramePipelineWorker` drains packet batches, reconstructs frames, performs local image processing, submits new raw frames to `YoloProcessor` when AI is enabled, and composes a final display-ready `QImage`.
-6. `YoloProcessor` runs ONNX inference on its own thread and returns the latest detection rectangles and inference timing.
+6. `YoloProcessor` runs ONNX inference on its own thread, using either OpenCV DNN or the repo-local Python helper, and returns the latest detection rectangles and inference timing.
 7. `UdpFrameProcessor` receives the final frame and only paints it to the widget surface.
 8. `ControlUI` sends runtime tuning, capture, network, and AI requests into the pipeline worker through queued signals.
 9. Optional recording is handled by `VideoRecorderWorker` on a separate thread through a bounded frame queue.
@@ -73,5 +74,5 @@
 - Reduce environment-specific assumptions in build and runtime setup.
 - Keep inference-related code isolated from the live receive/display path and fed through a mailbox/latest-frame policy so AI cannot build unbounded lag.
 - Keep demo traffic protocol-compatible with the receiver's existing frame-start, line-payload, and frame-end interpretation.
-- Keep packaged ONNX model assets deployable with the executable so AI validation survives moving to another Windows machine.
+- Keep packaged ONNX model assets deployable with the executable, while clearly documenting any temporary runtime fallback dependency that still blocks "single EXE on any machine" delivery for the current model/toolchain combination.
 - Keep a durable optimization log for hot-path changes and future YOLO optimization history.

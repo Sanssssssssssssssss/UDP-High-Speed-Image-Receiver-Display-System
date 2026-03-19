@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QMutex>
 #include <QObject>
+#include <QProcess>
 #include <QRect>
 #include <QVector>
 #include <atomic>
@@ -14,8 +15,10 @@ class YoloProcessor : public QObject {
 
 public:
     explicit YoloProcessor(const QString &modelPath, QObject *parent = nullptr);
+    ~YoloProcessor();
 
 public slots:
+    void initialize();
     void setEnabled(bool enabled);
     void submitFrame(const QImage &frame);
 
@@ -27,17 +30,29 @@ private slots:
     void processLatestFrame();
 
 private:
-    bool loadModel(const QString &modelPath);
-    QVector<QRect> runInference(const QImage &frame, int &inferenceMs) const;
+    enum BackendMode {
+        BackendUnavailable,
+        BackendOpenCv,
+        BackendPythonHelper
+    };
 
+    bool tryLoadOpenCvBackend(QString &statusText);
+    bool tryStartPythonHelper(QString &statusText);
+    QVector<QRect> runOpenCvInference(const QImage &frame, int &inferenceMs) const;
+    QVector<QRect> runPythonInference(const QImage &frame, int &inferenceMs);
+
+    QString modelPath;
+    QString helperPythonPath;
+    QString helperScriptPath;
     cv::dnn::Net net;
-    QString activeModelPath;
+    QProcess *helperProcess;
     QMutex frameMutex;
     QImage latestFrame;
     std::atomic<bool> enabled;
-    std::atomic<bool> modelLoaded;
     std::atomic<bool> processing;
     bool frameQueued;
+    BackendMode backendMode;
+    QString backendStatus;
 };
 
 #endif // YOLO_PROCESSOR_H
