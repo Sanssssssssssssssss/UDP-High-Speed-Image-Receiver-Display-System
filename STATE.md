@@ -46,6 +46,7 @@
 - A packaged `models/best.onnx` model is now deployed with the executable, and the AI path is no longer placeholder-only.
 - AI inference now runs on a dedicated thread with a latest-frame mailbox, and returned detection boxes are overlaid on the final display frame.
 - The local UDP demo scene now uses a stable dark-field pulsing target-like image to help validate AI activation, not only packet receive stability.
+- The built-in demo sender now also supports an exact pixel-by-pixel reference-image mode through `assets/demo_reference.*`; when no asset is present it falls back to the procedural scene.
 - The provided `best.onnx` does not load through OpenCV 3.4.8 DNN on this machine, so the current working AI path uses a repo-local Python `onnxruntime` helper while preserving the previously verified YOLO box decode semantics.
 
 ## Current Understanding

@@ -109,7 +109,24 @@ bool YoloProcessor::tryStartPythonHelper(QString &statusText) {
 
     helperProcess = new QProcess(this);
     helperProcess->setProcessChannelMode(QProcess::SeparateChannels);
-    helperProcess->start(helperPythonPath, QStringList() << helperScriptPath << modelPath);
+    helperProcess->setWorkingDirectory(QFileInfo(helperScriptPath).absolutePath());
+
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.remove("PYTHONHOME");
+    env.remove("PYTHONPATH");
+    env.remove("PYTHONEXECUTABLE");
+    env.remove("PYTHONSTARTUP");
+    env.remove("PYTHONUSERBASE");
+    env.remove("PYTHONBREAKPOINT");
+    env.insert("PYTHONNOUSERSITE", "1");
+
+    const QString helperScriptsDir = QFileInfo(helperPythonPath).absolutePath();
+    const QString helperVenvRoot = QDir(helperScriptsDir).filePath("..");
+    env.insert("VIRTUAL_ENV", QDir::cleanPath(helperVenvRoot));
+    env.insert("PATH", helperScriptsDir + ";" + env.value("PATH"));
+    helperProcess->setProcessEnvironment(env);
+
+    helperProcess->start(helperPythonPath, QStringList() << "-I" << helperScriptPath << modelPath);
     if (!helperProcess->waitForStarted(5000)) {
         statusText = QString("Python ONNX fallback failed to start: %1").arg(helperProcess->errorString());
         delete helperProcess;

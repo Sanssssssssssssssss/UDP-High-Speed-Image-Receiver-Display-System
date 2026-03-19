@@ -22,11 +22,16 @@ record video.
 #include "UdpReceiver.h"
 #include <QApplication>
 #include <QByteArray>
+#include <QColor>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHostAddress>
 #include <QLabel>
 #include <QFont>
+#include <QImage>
 #include <QSizePolicy>
 #include <QElapsedTimer>
 #include <QThread>
@@ -39,6 +44,33 @@ record video.
 namespace {
 const qint64 kDemoFrameIntervalNs = 1000000000LL / 60LL;
 
+QString findDemoReferencePath() {
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString currentDir = QDir::currentPath();
+    const QStringList candidateTails = QStringList()
+        << "assets/demo_reference.png"
+        << "assets/demo_reference.jpg"
+        << "assets/demo_reference.jpeg"
+        << "assets/demo_reference.bmp";
+
+    for (QStringList::const_iterator it = candidateTails.cbegin(); it != candidateTails.cend(); ++it) {
+        const QStringList candidates = QStringList()
+            << QDir(appDir).filePath(*it)
+            << QDir(appDir).filePath(QString("../%1").arg(*it))
+            << QDir(appDir).filePath(QString("../../%1").arg(*it))
+            << QDir(appDir).filePath(QString("../../../%1").arg(*it))
+            << QDir(currentDir).filePath(*it);
+        for (QStringList::const_iterator pathIt = candidates.cbegin(); pathIt != candidates.cend(); ++pathIt) {
+            const QString cleaned = QDir::cleanPath(*pathIt);
+            if (QFileInfo::exists(cleaned)) {
+                return cleaned;
+            }
+        }
+    }
+
+    return QString();
+}
+
 class LocalDemoSender : public QObject {
 public:
     explicit LocalDemoSender(QObject *parent = nullptr)
@@ -47,6 +79,13 @@ public:
           timer(new QTimer(this)),
           frameIndex(0),
           nextFrameDeadlineNs(0) {
+        const QString referencePath = findDemoReferencePath();
+        if (!referencePath.isEmpty()) {
+            QImage loaded(referencePath);
+            if (!loaded.isNull()) {
+                referenceFrame = loaded.convertToFormat(QImage::Format_RGB888).scaled(400, 400, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+            }
+        }
         timer->setTimerType(Qt::PreciseTimer);
         connect(timer, &QTimer::timeout, this, [this]() { sendDueFrames(); });
     }
@@ -123,6 +162,27 @@ private:
         return std::max(0.0, std::min(255.0, luminance));
     }
 
+    void buildSourcePixel(int x, int y, int &r, int &g, int &b) const {
+        if (!referenceFrame.isNull()) {
+            const QColor source = QColor::fromRgb(referenceFrame.pixel(x, y));
+            const double pulse = 0.72 + (0.28 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.09))));
+            const double floorBoost = 0.88 + (0.12 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.05))));
+            r = clampChannel((static_cast<double>(source.red()) * pulse * 0.96) + 3.0);
+            g = clampChannel((static_cast<double>(source.green()) * pulse) + 4.0);
+            b = clampChannel((static_cast<double>(source.blue()) * pulse * floorBoost));
+            return;
+        }
+
+        const double luminance = buildSceneLuminance(x, y, frameIndex);
+        r = clampChannel(luminance * 0.96);
+        g = clampChannel(luminance);
+        b = clampChannel(luminance * 0.34);
+    }
+
+    static int clampChannel(double value) {
+        return static_cast<int>(std::max(0.0, std::min(255.0, value)));
+    }
+
     QByteArray makeMarkerPacket(char marker) const {
         QByteArray datagram(4 + (400 * 2), marker);
         datagram[0] = 0x55;
@@ -140,10 +200,10 @@ private:
         datagram[3] = static_cast<char>(line & 0xFF);
 
         for (int x = 0; x < 400; ++x) {
-            const double luminance = buildSceneLuminance(x, line, frameIndex);
-            const int r = static_cast<int>(std::min(255.0, luminance * 0.96));
-            const int g = static_cast<int>(std::min(255.0, luminance));
-            const int b = static_cast<int>(std::min(255.0, luminance * 0.34));
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            buildSourcePixel(x, line, r, g, b);
             const quint16 rgb565 = packRgb565(r, g, b);
             datagram[4 + (x * 2)] = static_cast<char>((rgb565 >> 8) & 0xFF);
             datagram[4 + (x * 2) + 1] = static_cast<char>(rgb565 & 0xFF);
@@ -177,6 +237,7 @@ private:
 
     QUdpSocket *socket;
     QTimer *timer;
+    QImage referenceFrame;
     int frameIndex;
     QElapsedTimer cadenceTimer;
     qint64 nextFrameDeadlineNs;

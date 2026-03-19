@@ -233,3 +233,15 @@
 - Date: 2026-03-19
 - Decision: the built-in UDP demo should prioritize a stable, dark-field, bright-target scene with gentle brightness pulsing over synthetic packet-loss tricks or abstract motion patterns.
 - Reason: the user wants the demo to validate AI activation and target perception, not only receive stress behavior.
+
+## D-040 Sanitize the helper Python environment explicitly
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: launch the repo-local Python ONNX helper with a sanitized process environment and isolated interpreter mode, explicitly removing inherited `PYTHONHOME` / `PYTHONPATH` contamination from the parent process.
+- Reason: the current desktop launch environment can inject incompatible Python configuration that breaks the helper before inference even starts.
+
+## D-041 Support exact demo-image replay through a reference asset
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: the built-in UDP demo may load `assets/demo_reference.*`, resize it to `400x400`, pulse its brightness, convert it pixel-by-pixel to RGB565, and packetize it without changing the UDP protocol.
+- Reason: the user explicitly wants the demo to validate against a real target image rather than only a procedural approximation.

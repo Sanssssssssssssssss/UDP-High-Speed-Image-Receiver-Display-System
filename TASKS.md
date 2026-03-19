@@ -22,6 +22,7 @@
 - [ ] Validate ONNX detection quality on the real hardware scene and tune confidence/NMS/input-size settings if needed.
 - [ ] Decide whether AI model path should stay packaged-only or become operator-configurable from the AI page.
 - [ ] Decide whether to upgrade the native inference runtime so `best.onnx` can run without the current repo-local Python compatibility helper.
+- [ ] Add the exact reference image asset under `assets/demo_reference.*` so the built-in UDP demo matches the real target scene pixel-by-pixel.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.

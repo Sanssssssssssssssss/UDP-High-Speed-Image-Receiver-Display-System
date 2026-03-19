@@ -40,6 +40,20 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: AI validation is no longer confounded by synthetic packet-loss artifacts or an obviously wrong test image.
 - Validation: the app launches in `--demo` mode after the change, and runtime screenshots show the scene structure instead of the previous abstract sweep.
 
+### 2026-03-19 - Python helper startup hardened against contaminated parent environments
+- Area: AI inference compatibility
+- Before: the repo-local Python helper could still fail from inside the desktop app because the parent process injected incompatible Python environment settings, even though the helper worked from a clean shell.
+- After: the helper is launched with a sanitized process environment, explicit `VIRTUAL_ENV`, a patched `PATH`, and Python isolated mode.
+- Expected Effect: the ONNX fallback backend starts reliably from the built Qt app instead of failing with Python path-configuration dumps.
+- Validation: helper startup succeeds even when `PYTHONHOME` and `PYTHONPATH` are deliberately polluted before launch.
+
+### 2026-03-19 - Demo path now supports exact pixel-by-pixel reference replay
+- Area: Local UDP demo
+- Before: the built-in demo could only generate a procedural approximation of the target scene.
+- After: if `assets/demo_reference.*` exists, the demo loads it, rescales it to `400x400`, applies a brightness pulse, converts each source pixel to RGB565, and packetizes it through the unchanged UDP sender path.
+- Expected Effect: demo validation can be aligned exactly with a known reference image instead of depending on a hand-crafted approximation.
+- Validation: build and `--demo` launch stay stable after the new asset path is added; if no asset exists, the procedural fallback remains active.
+
 ### 2026-03-12 - Typed control forwarding for worker-side image controls
 - Area: UI control -> worker pipeline
 - Before: `UdpFrameProcessor` forwarded flip, tuning, capture, and AI control changes with string-based `QMetaObject::invokeMethod(...)`, which became brittle after the worker-thread refactor and left `flip` / `image tuning` effectively dead on the active path.
