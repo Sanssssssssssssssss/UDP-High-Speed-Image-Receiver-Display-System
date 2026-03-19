@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import os
 import sys
 import time
 
@@ -56,6 +57,43 @@ def emit(obj):
     sys.stdout.flush()
 
 
+def build_session(model_path):
+    session_options = ort.SessionOptions()
+    session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session_options.log_severity_level = 3
+    cpu_count = os.cpu_count() or 4
+    session_options.intra_op_num_threads = max(1, min(8, cpu_count - 1))
+    session_options.inter_op_num_threads = 1
+
+    available = ort.get_available_providers()
+    preferred = [
+        "DmlExecutionProvider",
+        "CUDAExecutionProvider",
+        "OpenVINOExecutionProvider",
+        "CPUExecutionProvider",
+    ]
+    providers = [name for name in preferred if name in available]
+    if not providers:
+        providers = ["CPUExecutionProvider"]
+
+    session = ort.InferenceSession(model_path, sess_options=session_options, providers=providers)
+    return session, providers[0], available
+
+
+def decode_frame(req):
+    if "image_rgb24" in req:
+        width = int(req["width"])
+        height = int(req["height"])
+        stride = int(req.get("stride", width * 3))
+        raw = base64.b64decode(req["image_rgb24"])
+        row_data = np.frombuffer(raw, dtype=np.uint8).reshape(height, stride)
+        frame_rgb = row_data[:, : width * 3].reshape(height, width, 3)
+        return np.ascontiguousarray(frame_rgb)
+
+    raw = base64.b64decode(req["image"])
+    return np.array(Image.open(io.BytesIO(raw)).convert("RGB"))
+
+
 def main():
     if len(sys.argv) < 2:
         emit({"ok": False, "error": "missing model path"})
@@ -64,9 +102,16 @@ def main():
     model_path = sys.argv[1]
 
     try:
-        session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        session, active_provider, available_providers = build_session(model_path)
         input_name = session.get_inputs()[0].name
-        emit({"ok": True, "backend": "onnxruntime", "model": model_path, "input": input_name})
+        emit({
+            "ok": True,
+            "backend": "onnxruntime",
+            "provider": active_provider,
+            "providers": available_providers,
+            "model": model_path,
+            "input": input_name,
+        })
     except Exception as exc:
         emit({"ok": False, "error": f"session init failed: {exc}"})
         return 2
@@ -78,8 +123,7 @@ def main():
 
         try:
             req = json.loads(line)
-            raw = base64.b64decode(req["image"])
-            frame_rgb = np.array(Image.open(io.BytesIO(raw)).convert("RGB"))
+            frame_rgb = decode_frame(req)
 
             input_size = int(req.get("input_size", 416))
             confidence = float(req.get("confidence", 0.85))
@@ -88,7 +132,7 @@ def main():
 
             resized = Image.fromarray(frame_rgb).resize((input_size, input_size), Image.BILINEAR)
             blob = np.asarray(resized, dtype=np.float32) / 255.0
-            blob = np.transpose(blob, (2, 0, 1))[None, ...]
+            blob = np.ascontiguousarray(np.transpose(blob, (2, 0, 1))[None, ...])
 
             start = time.perf_counter()
             outputs = session.run(None, {input_name: blob})

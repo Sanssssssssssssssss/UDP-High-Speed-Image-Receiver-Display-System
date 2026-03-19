@@ -54,6 +54,27 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: demo validation can be aligned exactly with a known reference image instead of depending on a hand-crafted approximation.
 - Validation: build and `--demo` launch stay stable after the new asset path is added; if no asset exists, the procedural fallback remains active.
 
+### 2026-03-19 - Helper transport changed from PNG to raw RGB24
+- Area: AI inference hot path
+- Before: every AI inference request encoded the current frame as PNG in C++, then decoded that PNG again in Python before preprocessing for ONNX.
+- After: `YoloProcessor` now sends raw RGB24 bytes with width/height/stride metadata, and the helper reconstructs the frame directly from that buffer.
+- Expected Effect: lower per-frame CPU cost, lower end-to-end inference latency, and less allocator pressure on both sides of the C++/Python boundary.
+- Validation: the helper still returns correct JSON results with the old decode semantics, and a local smoke run dropped the measured inference request time from roughly `191 ms` to roughly `101 ms` on the same simple 400x400 test image.
+
+### 2026-03-19 - ONNX Runtime session now prefers hardware providers and aggressive graph optimization
+- Area: AI inference backend
+- Before: the helper always created a plain CPU-only `onnxruntime` session with default options.
+- After: the helper now probes available execution providers in priority order, selects the fastest validated provider when present, and otherwise uses a graph-optimized CPU session with explicit thread configuration.
+- Expected Effect: compatible Windows machines can pick up hardware acceleration automatically, while CPU fallback also gets a stronger baseline.
+- Validation: helper startup now reports the active provider in its ready JSON, and the current machine cleanly selects `CPUExecutionProvider` because no faster compatible provider is installed.
+
+### 2026-03-19 - One extra deep frame copy removed before inference dispatch
+- Area: AI ingress
+- Before: the latest-frame mailbox copied the already-copied `QImage` one more time when `submitFrame()` ran.
+- After: the mailbox now stores the incoming `QImage` by assignment, relying on Qt image sharing rather than forcing another deep copy.
+- Expected Effect: lower overhead on the worker-to-inference handoff without changing inference correctness.
+- Validation: build and `--demo` launch remain stable after the change.
+
 ### 2026-03-12 - Typed control forwarding for worker-side image controls
 - Area: UI control -> worker pipeline
 - Before: `UdpFrameProcessor` forwarded flip, tuning, capture, and AI control changes with string-based `QMetaObject::invokeMethod(...)`, which became brittle after the worker-thread refactor and left `flip` / `image tuning` effectively dead on the active path.

@@ -1,5 +1,4 @@
 #include "YoloProcessor.h"
-#include <QBuffer>
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
@@ -158,8 +157,11 @@ bool YoloProcessor::tryStartPythonHelper(QString &statusText) {
         return false;
     }
 
+    const QString provider = doc.object().value("provider").toString();
     backendMode = BackendPythonHelper;
-    backendStatus = QString("AI model loaded via Python ONNX helper: %1").arg(modelPath);
+    backendStatus = provider.isEmpty()
+        ? QString("AI model loaded via Python ONNX helper: %1").arg(modelPath)
+        : QString("AI model loaded via Python ONNX helper (%1): %2").arg(provider, modelPath);
     statusText = backendStatus;
     return true;
 }
@@ -186,7 +188,7 @@ void YoloProcessor::submitFrame(const QImage &frame) {
 
     {
         QMutexLocker lock(&frameMutex);
-        latestFrame = frame.copy();
+        latestFrame = frame;
         frameQueued = true;
     }
 
@@ -285,15 +287,17 @@ QVector<QRect> YoloProcessor::runPythonInference(const QImage &frame, int &infer
         return detections;
     }
 
-    QByteArray encoded;
-    QBuffer buffer(&encoded);
-    buffer.open(QIODevice::WriteOnly);
-    frame.save(&buffer, "PNG");
+    const QImage rgbFrame = frame.format() == QImage::Format_RGB888
+        ? frame
+        : frame.convertToFormat(QImage::Format_RGB888);
+    const QByteArray rawBytes(reinterpret_cast<const char *>(rgbFrame.constBits()),
+                              rgbFrame.bytesPerLine() * rgbFrame.height());
 
     QJsonObject request;
-    request.insert("image", QString::fromLatin1(encoded.toBase64()));
-    request.insert("width", frame.width());
-    request.insert("height", frame.height());
+    request.insert("image_rgb24", QString::fromLatin1(rawBytes.toBase64()));
+    request.insert("width", rgbFrame.width());
+    request.insert("height", rgbFrame.height());
+    request.insert("stride", rgbFrame.bytesPerLine());
     request.insert("input_size", kModelInputSize);
     request.insert("confidence", kConfidenceThreshold);
     request.insert("nms_score", kNmsScoreThreshold);

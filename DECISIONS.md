@@ -245,3 +245,15 @@
 - Date: 2026-03-19
 - Decision: the built-in UDP demo may load `assets/demo_reference.*`, resize it to `400x400`, pulse its brightness, convert it pixel-by-pixel to RGB565, and packetize it without changing the UDP protocol.
 - Reason: the user explicitly wants the demo to validate against a real target image rather than only a procedural approximation.
+
+## D-042 Prefer raw RGB transport for the Python ONNX helper
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: send `QImage::Format_RGB888` frame data to the Python ONNX helper as raw RGB24 bytes plus width/height/stride metadata, instead of PNG-encoding every inference request.
+- Reason: PNG encode/decode was pure overhead on the inference hot path and materially increased end-to-end latency.
+
+## D-043 Prefer the fastest validated ONNX Runtime provider at startup
+- Status: Accepted
+- Date: 2026-03-19
+- Decision: the Python ONNX helper should select the best available `onnxruntime` execution provider in priority order, then fall back to a graph-optimized CPU session when no hardware provider is available.
+- Reason: this preserves correctness while allowing hardware acceleration to come online automatically on compatible Windows deployments.

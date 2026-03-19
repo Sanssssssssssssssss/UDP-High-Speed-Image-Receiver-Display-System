@@ -23,6 +23,7 @@
 - [ ] Decide whether AI model path should stay packaged-only or become operator-configurable from the AI page.
 - [ ] Decide whether to upgrade the native inference runtime so `best.onnx` can run without the current repo-local Python compatibility helper.
 - [ ] Add the exact reference image asset under `assets/demo_reference.*` so the built-in UDP demo matches the real target scene pixel-by-pixel.
+- [ ] Benchmark real-scene end-to-end AI latency after the new raw-RGB helper transport and provider-selection changes.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
@@ -84,6 +85,8 @@
 - [x] Restore the previously verified YOLO decode semantics while adapting final box projection to the current frame composition path.
 - [x] Add a repo-local Python `onnxruntime` compatibility fallback for `best.onnx` when OpenCV 3.4.8 DNN cannot import it.
 - [x] Change the local UDP demo scene to a stable pulsing target-like image that is more useful for AI validation.
+- [x] Remove PNG round-trips from the Python ONNX helper path and replace them with raw RGB24 transport.
+- [x] Teach the Python ONNX helper to report and prefer the fastest available execution provider while keeping a tuned CPU fallback.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.
