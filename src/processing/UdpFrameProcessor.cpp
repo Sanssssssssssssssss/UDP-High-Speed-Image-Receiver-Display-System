@@ -83,8 +83,8 @@ void UdpFrameProcessor::setDenoise(int value) {
     emit denoiseRequested(value);
 }
 
-void UdpFrameProcessor::applyReceiverSettings(const QString &address, quint16 port) {
-    emit receiverSettingsApplyRequested(address, port);
+void UdpFrameProcessor::applyReceiverSettings(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface) {
+    emit receiverSettingsApplyRequested(address, port, useNpcap, npcapInterface);
 }
 
 void UdpFrameProcessor::setAiDetectionEnabled(bool enabled) {

@@ -26,10 +26,12 @@
 - [ ] Benchmark real-scene end-to-end AI latency after the new raw-RGB helper transport and provider-selection changes.
 - [ ] Decide whether to keep the current Python+DirectML path as the near-term deployment target or replace it with a native C++ ONNX Runtime integration.
 - [ ] Validate that the FPGA path produces actual RX traffic on the ASIX USB Ethernet adapter and confirm the target IP/port or capture mode assumptions before further Qt-side receiver changes.
+- [ ] Install Npcap on the hardware test machine and validate the new diagnostic capture mode on `以太网 4`.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
 - [ ] Hardware bring-up debugging for the ASIX USB Ethernet link, which currently shows zero RX packets during attempted FPGA streaming.
+- [ ] Npcap diagnostic ingress integration and bring-up validation.
 
 ## Completed
 - [x] Clone upstream repository into `D:\GPT_Project\UDP-High-Speed-Image-Receiver-Display-System`.

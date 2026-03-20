@@ -429,7 +429,7 @@ int runApplication(int argc, char *argv[]) {
     });
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &mainWidget, [&]() { stopDemo(); });
 
-    controlUI->onReceiverSettingsChanged("0.0.0.0", 8080);
+    controlUI->onReceiverSettingsChanged("0.0.0.0", 8080, false, QString::fromUtf8("以太网 4"));
     controlUI->onAiStatusChanged("AI detection is disabled.");
     updateDemoUi(false, demoDisabledText);
 

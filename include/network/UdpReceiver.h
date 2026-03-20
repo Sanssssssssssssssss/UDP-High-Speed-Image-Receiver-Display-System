@@ -4,7 +4,10 @@
 #include <QList>
 #include <QObject>
 #include <QProcess>
+#include <QString>
 #include <QUdpSocket>
+
+class NpcapCaptureSession;
 
 class UdpReceiver : public QObject {
     Q_OBJECT
@@ -23,7 +26,7 @@ signals:
 
 public slots:
     // Start or restart receiving UDP data
-    void startReceiving(const QString &address, quint16 port);
+    void startReceiving(const QString &address, quint16 port, bool useNpcap = false, const QString &npcapInterface = QString());
     void stopReceiving();
 
 private slots:
@@ -35,6 +38,9 @@ private:
     QProcess *tsharkProcess; // Tshark process for network monitoring
     QString boundAddress;
     quint16 boundPort;
+    bool usingNpcap;
+    QString boundNpcapInterface;
+    NpcapCaptureSession *npcapSession;
 };
 
 #endif // UDP_RECEIVER_H

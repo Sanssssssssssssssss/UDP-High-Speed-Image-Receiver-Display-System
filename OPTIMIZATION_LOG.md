@@ -145,6 +145,13 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: recording should no longer directly stall live display processing.
 - Validation: recording start/stop correctness and playable output file still need manual verification.
 
+### 2026-03-20 - Optional Npcap diagnostic ingress added beside QUdpSocket
+- Area: Hardware bring-up / receive diagnostics
+- Before: the app could only receive through `QUdpSocket`, so if FPGA traffic was only visible in promiscuous/capture mode there was no way to validate it without an external sniffer.
+- After: the Network page now exposes an optional Windows Npcap diagnostic mode plus interface name. When enabled, `UdpReceiver` dynamically loads `wpcap`, opens the selected interface in promiscuous mode, filters by UDP destination port, extracts UDP payloads from captured Ethernet frames, and forwards those payloads into the unchanged parser path.
+- Expected Effect: hardware debugging can now distinguish "no packets on the wire" from "packets exist but are not host-addressed UDP that `QUdpSocket` can see" without changing frame reconstruction semantics.
+- Validation: project rebuild succeeds; the app launches normally without Npcap installed; on machines missing `wpcap.dll`, the receiver reports an explicit runtime-missing status instead of crashing.
+
 ## Future Entries
 
 ### Template

@@ -257,3 +257,9 @@
 - Date: 2026-03-19
 - Decision: the Python ONNX helper should select the best available `onnxruntime` execution provider in priority order, then fall back to a graph-optimized CPU session when no hardware provider is available.
 - Reason: this preserves correctness while allowing hardware acceleration to come online automatically on compatible Windows deployments.
+
+## D-044 Add an optional Npcap diagnostic ingress path without touching the parser
+- Status: Accepted
+- Date: 2026-03-20
+- Decision: keep the existing `QUdpSocket` receive path as the default, but add an operator-selectable Windows-only Npcap diagnostic mode that captures Ethernet traffic promiscuously on a chosen interface, filters by UDP destination port, extracts the UDP payload, and feeds that payload into the unchanged `AA -> line payload -> BB` parser.
+- Reason: real FPGA bring-up on the USB Ethernet adapter currently shows zero packets at the standard UDP socket layer, and the user explicitly wants to test whether packets are only visible through a capture-style path similar to Wireshark/Npcap.

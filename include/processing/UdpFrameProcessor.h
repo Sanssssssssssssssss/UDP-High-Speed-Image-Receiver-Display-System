@@ -25,7 +25,7 @@ public slots:
     void setGamma(int value);
     void setSharpness(int value);
     void setDenoise(int value);
-    void applyReceiverSettings(const QString &address, quint16 port);
+    void applyReceiverSettings(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void setAiDetectionEnabled(bool enabled);
 
 signals:
@@ -33,7 +33,7 @@ signals:
     void fpsChanged(int fps);
     void performanceStatsChanged(const QString &statsText);
     void receiverStatusChanged(const QString &statusText);
-    void receiverSettingsChanged(const QString &address, quint16 port);
+    void receiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void aiStatusChanged(const QString &statusText);
     void saveSnapshotRequested(const QString &directory);
     void toggleRecordingRequested(const QString &directory, const QString &format, int fps);
@@ -43,7 +43,7 @@ signals:
     void gammaRequested(int value);
     void sharpnessRequested(int value);
     void denoiseRequested(int value);
-    void receiverSettingsApplyRequested(const QString &address, quint16 port);
+    void receiverSettingsApplyRequested(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void aiDetectionRequested(bool enabled);
 
 protected:

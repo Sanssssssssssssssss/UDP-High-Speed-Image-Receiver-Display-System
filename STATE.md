@@ -52,6 +52,8 @@
 - The local Python ONNX environment now exposes `DmlExecutionProvider` on the Intel Arc GPU, so the helper is no longer CPU-only on this machine.
 - Live hardware debugging on 2026-03-20 showed that the ASIX USB Ethernet adapter (`以太网 4`, `169.254.195.198`) was link-up at 1 Gbps but reported zero received bytes/packets while the FPGA path was expected to be active.
 - A direct user-space UDP listener on `0.0.0.0:8080` also observed zero packets over the same interval, while the application itself was verified to bind `0.0.0.0:8080` successfully and the built-in demo still produced visible frames.
+- The receiver now has an optional Windows-only Npcap diagnostic mode that can be enabled from the Network page, configured with an interface name, and used to sniff UDP payloads from raw Ethernet traffic without changing the existing parser semantics.
+- This machine still does not have `wpcap.dll` installed, so the new Npcap mode currently reports a runtime-missing status until Npcap is installed.
 
 ## Current Understanding
 - This is a Windows-oriented Qt Widgets UDP image receiver that reconstructs RGB565 line data into a displayed frame.
@@ -59,7 +61,7 @@
 - Several runtime assumptions are still environment-specific, but the image adjustment controls are now connected on the receiver side.
 
 ## Immediate Next Step
-- Determine whether the FPGA is actually emitting Ethernet frames onto the ASIX adapter and whether it targets the host IP/port directly or still relies on a promiscuous/capture-style receive path that `QUdpSocket` cannot see.
+- Install Npcap on this machine and validate whether the new diagnostic capture mode on `以太网 4` can see FPGA traffic even when the standard `QUdpSocket` path still sees zero packets.
 
 ## Risks
 - Hardcoded paths will prevent portability and make onboarding brittle.

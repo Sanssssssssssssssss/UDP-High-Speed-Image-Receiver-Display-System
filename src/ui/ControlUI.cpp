@@ -61,6 +61,8 @@ ControlUI::ControlUI(QWidget *parent)
       formatComboBox(nullptr),
       addressEdit(nullptr),
       portSpinBox(nullptr),
+      npcapModeCheckBox(nullptr),
+      npcapInterfaceEdit(nullptr),
       receiverStatusLabel(nullptr),
       applyReceiverButton(nullptr),
       demoModeCheckBox(nullptr),
@@ -485,6 +487,23 @@ QWidget *ControlUI::createNetworkPage() {
     networkHint->setWordWrap(true);
     networkLayout->addWidget(networkHint);
 
+    npcapModeCheckBox = new QCheckBox("Use Npcap Diagnostic Capture", networkCard);
+    networkLayout->addWidget(npcapModeCheckBox);
+
+    auto *npcapLabel = new QLabel("Npcap Interface", networkCard);
+    npcapLabel->setObjectName("ControlLabel");
+    networkLayout->addWidget(npcapLabel);
+
+    npcapInterfaceEdit = new QLineEdit(QString::fromUtf8("以太网 4"), networkCard);
+    npcapInterfaceEdit->setPlaceholderText("以太网 4");
+    npcapInterfaceEdit->setMinimumHeight(46);
+    networkLayout->addWidget(npcapInterfaceEdit);
+
+    auto *npcapHint = new QLabel("Use this when the FPGA stream is only visible in promiscuous/capture mode. The bind address is then informational, while the UDP destination port filter still applies.", networkCard);
+    npcapHint->setObjectName("HintLabel");
+    npcapHint->setWordWrap(true);
+    networkLayout->addWidget(npcapHint);
+
     auto *divider = new QFrame(networkCard);
     divider->setFrameShape(QFrame::HLine);
     divider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
@@ -611,9 +630,11 @@ void ControlUI::onReceiverStatusChanged(const QString &statusText) {
     receiverStatusLabel->setText(statusText);
 }
 
-void ControlUI::onReceiverSettingsChanged(const QString &address, quint16 port) {
+void ControlUI::onReceiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface) {
     addressEdit->setText(address);
     portSpinBox->setValue(static_cast<int>(port));
+    npcapModeCheckBox->setChecked(useNpcap);
+    npcapInterfaceEdit->setText(npcapInterface);
 }
 
 void ControlUI::onAiStatusChanged(const QString &statusText) {
@@ -732,8 +753,20 @@ void ControlUI::onApplyReceiverSettings() {
         return;
     }
 
-    receiverStatusLabel->setText(QString("Receiver: applying %1:%2 ...").arg(address).arg(portSpinBox->value()));
-    emit receiverSettingsRequested(address, static_cast<quint16>(portSpinBox->value()));
+    const bool useNpcap = npcapModeCheckBox->isChecked();
+    const QString npcapInterface = npcapInterfaceEdit->text().trimmed();
+    if (useNpcap && npcapInterface.isEmpty()) {
+        QMessageBox::warning(this, "Npcap Interface Required", "Please enter the Npcap interface name when diagnostic capture is enabled.");
+        return;
+    }
+
+    receiverStatusLabel->setText(useNpcap
+                                     ? QString("Receiver: applying Npcap capture on %1 | UDP dport=%2 ...").arg(npcapInterface).arg(portSpinBox->value())
+                                     : QString("Receiver: applying %1:%2 ...").arg(address).arg(portSpinBox->value()));
+    emit receiverSettingsRequested(address,
+                                   static_cast<quint16>(portSpinBox->value()),
+                                   useNpcap,
+                                   npcapInterface);
 }
 
 void ControlUI::onAiDetectionChanged(bool checked) {

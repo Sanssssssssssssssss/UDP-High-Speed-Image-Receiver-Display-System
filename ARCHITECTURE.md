@@ -3,7 +3,7 @@
 ## 1. Current Stack
 - Language: C++11
 - UI: Qt Widgets
-- Networking: `QUdpSocket`
+- Networking: `QUdpSocket` + optional Npcap raw-capture diagnostic path
 - Concurrency: Qt thread + queued/direct signal/slot + OpenMP row-level parallel loops
 - Image/video: `QImage`, `QPainter`, OpenCV `VideoWriter`
 - Build: qmake `.pro`
@@ -13,6 +13,7 @@
 
 ### `UdpReceiver`
 - Owns the UDP socket and optional tshark bootstrap process.
+- Can either bind a standard UDP socket or, on Windows, dynamically switch into an optional Npcap promiscuous-capture path that extracts UDP payloads from Ethernet frames.
 - Receives datagrams in bounded batches and emits raw packet payload batches upstream.
 - Supports receiver-side rebind to a new address/port without restarting the full application.
 
@@ -44,7 +45,7 @@
 1. `main.cpp` creates `UdpFrameProcessor` and `ControlUI`.
 2. `src/app/main.cpp` can optionally start a local UDP stress demo for startup verification.
 3. `UdpFrameProcessor` creates `UdpReceiver` on a worker thread.
-4. `UdpReceiver` binds the UDP socket and emits `newFrameBatch`.
+4. `UdpReceiver` either binds the UDP socket or starts an optional Npcap capture session on the selected interface, then emits `newFrameBatch`.
 5. `UdpFramePipelineWorker` drains packet batches, reconstructs frames, performs local image processing, submits new raw frames to `YoloProcessor` when AI is enabled, and composes a final display-ready `QImage`.
 6. `YoloProcessor` runs ONNX inference on its own thread, using either OpenCV DNN or the repo-local Python helper, and returns the latest detection rectangles and inference timing.
 7. `UdpFrameProcessor` receives the final frame and only paints it to the widget surface.
@@ -76,3 +77,4 @@
 - Keep demo traffic protocol-compatible with the receiver's existing frame-start, line-payload, and frame-end interpretation.
 - Keep packaged ONNX model assets deployable with the executable, while clearly documenting any temporary runtime fallback dependency that still blocks "single EXE on any machine" delivery for the current model/toolchain combination.
 - Keep a durable optimization log for hot-path changes and future YOLO optimization history.
+- Keep any optional diagnostic capture path isolated so the core frame parser still consumes the same UDP payload batches regardless of whether packets came from `QUdpSocket` or Npcap.

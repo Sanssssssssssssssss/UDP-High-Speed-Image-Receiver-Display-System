@@ -82,6 +82,8 @@ UdpFramePipelineWorker::UdpFramePipelineWorker(QObject *parent)
       lutDirty(true),
       receiverAddress("0.0.0.0"),
       receiverPort(8080),
+      receiverUseNpcap(false),
+      receiverNpcapInterface(QString::fromUtf8("以太网 4")),
       aiDetectionEnabled(false),
       aiStatusText("AI detection is disabled."),
       lastInferenceMs(0),
@@ -165,13 +167,13 @@ void UdpFramePipelineWorker::start() {
     receiver = new UdpReceiver();
     receiverThread = new QThread();
     receiver->moveToThread(receiverThread);
-    connect(receiverThread, &QThread::started, receiver, [this]() { receiver->startReceiving(receiverAddress, receiverPort); });
+    connect(receiverThread, &QThread::started, receiver, [this]() { receiver->startReceiving(receiverAddress, receiverPort, receiverUseNpcap, receiverNpcapInterface); });
     connect(receiver, &UdpReceiver::newFrameBatch, this, &UdpFramePipelineWorker::enqueueFrameBatch, Qt::DirectConnection);
     connect(receiver, &UdpReceiver::receiverBindingChanged, this, &UdpFramePipelineWorker::onReceiverBindingChanged, Qt::QueuedConnection);
     connect(receiverThread, &QThread::finished, receiver, &QObject::deleteLater);
     receiverThread->start();
 
-    emit receiverSettingsChanged(receiverAddress, receiverPort);
+    emit receiverSettingsChanged(receiverAddress, receiverPort, receiverUseNpcap, receiverNpcapInterface);
     emit aiStatusChanged(aiStatusText);
     emit frameReady(displayBuffers[frontDisplayIndex]);
 }
@@ -318,9 +320,14 @@ void UdpFramePipelineWorker::setDenoise(int value) {
     refreshDisplayFromRaw();
 }
 
-void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint16 port) {
+void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface) {
     receiverAddress = address.trimmed();
     receiverPort = port;
+    receiverUseNpcap = useNpcap;
+    receiverNpcapInterface = npcapInterface.trimmed();
+    if (receiverNpcapInterface.isEmpty()) {
+        receiverNpcapInterface = QString::fromUtf8("以太网 4");
+    }
     resetParserState(true);
     rawImage.fill(Qt::black);
     displayBuffers[0].fill(Qt::black);
@@ -330,15 +337,19 @@ void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint
     lastInferenceMs = 0;
 
     emit frameReady(displayBuffers[frontDisplayIndex]);
-    emit receiverStatusChanged(QString("Rebinding receiver to %1:%2 ...").arg(receiverAddress).arg(receiverPort));
-    emit receiverSettingsChanged(receiverAddress, receiverPort);
+    emit receiverStatusChanged(receiverUseNpcap
+                                   ? QString("Rebinding receiver via Npcap on %1 | UDP dport=%2 ...").arg(receiverNpcapInterface).arg(receiverPort)
+                                   : QString("Rebinding receiver to %1:%2 ...").arg(receiverAddress).arg(receiverPort));
+    emit receiverSettingsChanged(receiverAddress, receiverPort, receiverUseNpcap, receiverNpcapInterface);
 
     if (receiver != nullptr) {
         QMetaObject::invokeMethod(receiver,
                                   "startReceiving",
                                   Qt::QueuedConnection,
                                   Q_ARG(QString, receiverAddress),
-                                  Q_ARG(quint16, receiverPort));
+                                  Q_ARG(quint16, receiverPort),
+                                  Q_ARG(bool, receiverUseNpcap),
+                                  Q_ARG(QString, receiverNpcapInterface));
     }
 }
 

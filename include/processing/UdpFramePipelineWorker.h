@@ -25,7 +25,7 @@ signals:
     void recordingStateChanged(bool isRecording);
     void statsReady(const QString &statsText);
     void receiverStatusChanged(const QString &statusText);
-    void receiverSettingsChanged(const QString &address, quint16 port);
+    void receiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void aiStatusChanged(const QString &statusText);
     void recordFrameReady(const QImage &frame);
     void startRecordingRequested(const QString &directory, const QString &format, int fps, const QSize &frameSize);
@@ -42,7 +42,7 @@ public slots:
     void setGamma(int value);
     void setSharpness(int value);
     void setDenoise(int value);
-    void applyReceiverSettings(const QString &address, quint16 port);
+    void applyReceiverSettings(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void setAiDetectionEnabled(bool enabled);
 
 private slots:
@@ -98,6 +98,8 @@ private:
 
     QString receiverAddress;
     quint16 receiverPort;
+    bool receiverUseNpcap;
+    QString receiverNpcapInterface;
     bool aiDetectionEnabled;
     QString aiStatusText;
     int lastInferenceMs;

@@ -30,7 +30,7 @@ signals:
     void gammaChanged(int value);
     void sharpnessChanged(int value);
     void denoiseChanged(int value);
-    void receiverSettingsRequested(const QString &address, quint16 port);
+    void receiverSettingsRequested(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void aiDetectionToggled(bool enabled);
     void demoModeRequested(bool enabled);
 
@@ -39,7 +39,7 @@ public slots:
     void onFPSChanged(int fps);
     void onPerformanceStatsChanged(const QString &statsText);
     void onReceiverStatusChanged(const QString &statusText);
-    void onReceiverSettingsChanged(const QString &address, quint16 port);
+    void onReceiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
     void onAiStatusChanged(const QString &statusText);
     void onDemoStateChanged(bool enabled, const QString &statusText);
 
@@ -99,6 +99,8 @@ private:
 
     QLineEdit *addressEdit;
     QSpinBox *portSpinBox;
+    QCheckBox *npcapModeCheckBox;
+    QLineEdit *npcapInterfaceEdit;
     QLabel *receiverStatusLabel;
     QPushButton *applyReceiverButton;
     QCheckBox *demoModeCheckBox;

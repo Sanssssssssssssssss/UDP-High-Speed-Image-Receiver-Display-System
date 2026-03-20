@@ -64,6 +64,11 @@
 - The system shall support an ONNX-backed object detection path that can be enabled from the UI and overlays detections on the displayed frame.
 - Reason: the user has provided an ONNX model and explicitly requested real integration, not only an AI placeholder.
 
+### FR-014 Optional raw-capture diagnostic receive path
+- Status: Confirmed
+- The system shall provide an operator-selectable diagnostic receive mode that can use Npcap on Windows to capture Ethernet traffic from a chosen interface, extract UDP payloads for the configured destination port, and feed those payloads into the existing frame parser without changing protocol semantics.
+- Reason: the user explicitly requested a way to test real FPGA traffic when standard host-addressed UDP receive may not see packets unless capture/promiscuous mode is used.
+
 ## 3. Non-Functional Requirements
 
 ### NFR-001 Maintainability
