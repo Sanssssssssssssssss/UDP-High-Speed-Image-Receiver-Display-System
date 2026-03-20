@@ -4,6 +4,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QElapsedTimer>
+#include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
 #include <QList>
@@ -112,6 +113,7 @@ private:
     QComboBox *formatComboBox;
 
     QComboBox *sourceModeComboBox;
+    QWidget *usbSettingsContainer;
     QLineEdit *addressEdit;
     QSpinBox *portSpinBox;
     QCheckBox *npcapModeCheckBox;

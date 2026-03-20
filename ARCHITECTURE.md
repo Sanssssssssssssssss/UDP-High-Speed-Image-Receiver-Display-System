@@ -39,7 +39,8 @@
 
 ### `ControlUI`
 - Keeps stream status pinned while exposing switchable subpages for image tuning, capture, network, and AI controls.
-- Emits adjustment signals for brightness/gamma/sharpness/denoise, flip state, runtime bind address/port changes, and AI enable state.
+- Presents Network-page input selection as `UDP Socket` or `FT601 USB`, while keeping Npcap as an optional diagnostic capture toggle under the UDP path only.
+- Emits adjustment signals for brightness/gamma/sharpness/denoise, flip state, runtime bind address/port changes, ingress selection, and AI enable state.
 
 ### `YoloProcessor`
 - Owns ONNX model loading and CPU inference on a dedicated thread.

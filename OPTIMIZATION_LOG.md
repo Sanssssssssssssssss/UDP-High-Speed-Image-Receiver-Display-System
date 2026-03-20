@@ -159,6 +159,13 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: FPGA USB transport can be added later without redesigning frame reconstruction; transport-specific framing stays at the ingress boundary while parser semantics remain stable.
 - Validation: project rebuild succeeds with the new ingress classes and expanded receiver-setting signatures; FT601 mode now reports runtime status and awaits real D3XX read-loop integration.
 
+### 2026-03-20 - Network UI input semantics simplified
+- Area: Operator workflow / Network UI
+- Before: the Network page presented `UDP Socket`, `Npcap Diagnostic`, and `FT601 USB` as peer input sources, which blurred the distinction between a transport and a UDP-side diagnostic capture option.
+- After: the Network page now exposes only two mutually exclusive input sources, `UDP Socket` and `FT601 USB`, while Npcap is a separate optional toggle that only applies when UDP is selected.
+- Expected Effect: the operator model becomes clearer: choose transport first, then optionally layer Npcap on top of UDP when needed for capture-mode debugging.
+- Validation: project rebuild succeeds and the receiver-settings flow still maps correctly to the existing backend mode values.
+
 ## Future Entries
 
 ### Template

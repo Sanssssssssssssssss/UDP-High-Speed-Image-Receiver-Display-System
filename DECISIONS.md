@@ -275,3 +275,9 @@
 - Date: 2026-03-20
 - Decision: the FT601 path shall transport a continuous byte stream composed of repeated `804-byte` logical packets, where bytes `0..3` are the sync header `55 33 11 77` and bytes `4..803` are the existing `800-byte` payload packet whose `0xAA -> line payload -> 0xBB` meaning stays unchanged.
 - Reason: FT601 bulk reads do not preserve UDP datagram boundaries, so the host needs a minimal framing shim while the payload semantics remain identical to the proven parser path.
+
+## D-047 Keep operator-facing input selection binary and treat Npcap as a UDP option
+- Status: Accepted
+- Date: 2026-03-20
+- Decision: the Network UI should present only two mutually exclusive input sources, `UDP Socket` and `FT601 USB`, while Npcap remains an optional diagnostic capture toggle that only modifies the UDP path.
+- Reason: this matches the user's intended mental model more closely and reduces operator confusion compared with presenting Npcap as a third peer input source.

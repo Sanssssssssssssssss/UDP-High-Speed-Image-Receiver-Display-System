@@ -16,6 +16,7 @@
 - Npcap is now installed on this machine, so the diagnostic capture path is available for hardware debugging.
 - Hardware bring-up has improved from "zero visible traffic" to "some data visible", but the user still reports severe packet loss and unstable image reception.
 - The software now supports a third ingress mode, `FT601 USB`, alongside `UDP Socket` and `Npcap Diagnostic`.
+- The Network page now exposes only two operator-facing input choices, `UDP Socket` and `FT601 USB`; Npcap is a separate optional diagnostic toggle under the UDP path.
 - The FT601 path is currently a software scaffold: ingress-mode wiring, UI controls, runtime `FTD3XX.dll` checks, and a host-side packetizer are in place.
 - The FT601 host-side packetizer is designed around `804-byte` logical packets made of a 4-byte sync header `55 33 11 77` plus the unchanged `800-byte` payload packet semantics.
 - The real FT601 D3XX device open/read loop is still pending.
