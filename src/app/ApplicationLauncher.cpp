@@ -121,10 +121,10 @@ private:
     static double buildSceneLuminance(int x, int y, int frameIndex) {
         const double nx = static_cast<double>(x) / 399.0;
         const double ny = static_cast<double>(y) / 399.0;
-        const double pulse = 0.78 + (0.22 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.09))));
+        const double pulse = 0.90 + (0.10 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.09))));
         const double shimmer = 0.95 + (0.05 * std::sin((static_cast<double>(frameIndex) * 0.17) + (nx * 5.0)));
 
-        double luminance = 4.0;
+        double luminance = 22.0;
         luminance += 10.0 * (1.0 - ((ny - 0.18) * (ny - 0.18)));
         luminance += 5.0 * std::sin((nx * 9.0) + (ny * 3.0));
 
@@ -165,11 +165,11 @@ private:
     void buildSourcePixel(int x, int y, int &r, int &g, int &b) const {
         if (!referenceFrame.isNull()) {
             const QColor source = QColor::fromRgb(referenceFrame.pixel(x, y));
-            const double pulse = 0.72 + (0.28 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.09))));
-            const double floorBoost = 0.88 + (0.12 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.05))));
-            r = clampChannel((static_cast<double>(source.red()) * pulse * 0.96) + 3.0);
-            g = clampChannel((static_cast<double>(source.green()) * pulse) + 4.0);
-            b = clampChannel((static_cast<double>(source.blue()) * pulse * floorBoost));
+            const double pulse = 0.90 + (0.10 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.09))));
+            const double floorBoost = 0.96 + (0.04 * (0.5 + (0.5 * std::sin(static_cast<double>(frameIndex) * 0.05))));
+            r = clampChannel((static_cast<double>(source.red()) * pulse * 0.98) + 12.0);
+            g = clampChannel((static_cast<double>(source.green()) * pulse) + 14.0);
+            b = clampChannel((static_cast<double>(source.blue()) * pulse * floorBoost) + 6.0);
             return;
         }
 
