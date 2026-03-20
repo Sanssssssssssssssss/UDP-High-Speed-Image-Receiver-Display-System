@@ -166,6 +166,13 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: the operator model becomes clearer: choose transport first, then optionally layer Npcap on top of UDP when needed for capture-mode debugging.
 - Validation: project rebuild succeeds and the receiver-settings flow still maps correctly to the existing backend mode values.
 
+### 2026-03-20 - Network page source panes isolated to stop overlap
+- Area: Operator workflow / Network UI layout
+- Before: after introducing FT601, several UDP-specific controls still lived on the outer Network layout, so switching to `FT601 USB` could leave UDP widgets occupying the same vertical space and make the page feel cramped.
+- After: UDP-only controls now live inside `udpSettingsContainer`, FT601-only controls live inside `usbSettingsContainer`, and shared `Apply Input Settings` plus status text stay in a common footer section. Source switching now hides one full pane and shows the other instead of partially overlapping controls.
+- Expected Effect: cleaner source switching, better page stretch behavior, and less layout breakage when we add more FT601 or UDP diagnostics later.
+- Validation: project rebuild succeeds and the application survives a launch smoke test after the layout restructure.
+
 ## Future Entries
 
 ### Template

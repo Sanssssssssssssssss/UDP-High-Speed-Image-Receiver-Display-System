@@ -60,6 +60,7 @@ ControlUI::ControlUI(QWidget *parent)
       saveDirectoryLabel(nullptr),
       formatComboBox(nullptr),
       sourceModeComboBox(nullptr),
+      udpSettingsContainer(nullptr),
       usbSettingsContainer(nullptr),
       addressEdit(nullptr),
       portSpinBox(nullptr),
@@ -441,6 +442,8 @@ QWidget *ControlUI::createNetworkPage() {
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(12);
+    networkUdpWidgets.clear();
+    networkUsbWidgets.clear();
 
     auto *networkCard = createCard(page, "Receiver Setup");
     auto *networkLayout = qobject_cast<QVBoxLayout *>(networkCard->layout());
@@ -461,20 +464,30 @@ QWidget *ControlUI::createNetworkPage() {
     connect(sourceModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(onSourceModeChanged(int)));
     networkLayout->addWidget(sourceModeComboBox);
 
-    auto *udpSectionTitle = new QLabel("UDP Options", networkCard);
-    udpSectionTitle->setObjectName("ControlLabel");
-    networkLayout->addWidget(udpSectionTitle);
+    udpSettingsContainer = new QWidget(networkCard);
+    auto *udpLayout = new QVBoxLayout(udpSettingsContainer);
+    udpLayout->setContentsMargins(0, 0, 0, 0);
+    udpLayout->setSpacing(12);
+    networkLayout->addWidget(udpSettingsContainer);
+    networkUdpWidgets.append(udpSettingsContainer);
 
-    addressEdit = new QLineEdit("0.0.0.0", networkCard);
+    auto *udpSectionTitle = new QLabel("UDP Options", udpSettingsContainer);
+    udpSectionTitle->setObjectName("ControlLabel");
+    udpLayout->addWidget(udpSectionTitle);
+    networkUdpWidgets.append(udpSectionTitle);
+
+    addressEdit = new QLineEdit("0.0.0.0", udpSettingsContainer);
     addressEdit->setPlaceholderText("0.0.0.0");
     addressEdit->setMinimumHeight(46);
 
-    auto *addressLabel = new QLabel("Bind Address", networkCard);
+    auto *addressLabel = new QLabel("Bind Address", udpSettingsContainer);
     addressLabel->setObjectName("ControlLabel");
-    networkLayout->addWidget(addressLabel);
-    networkLayout->addWidget(addressEdit);
+    udpLayout->addWidget(addressLabel);
+    udpLayout->addWidget(addressEdit);
+    networkUdpWidgets.append(addressLabel);
+    networkUdpWidgets.append(addressEdit);
 
-    portSpinBox = new QSpinBox(networkCard);
+    portSpinBox = new QSpinBox(udpSettingsContainer);
     portSpinBox->setRange(1, 65535);
     portSpinBox->setValue(8080);
     portSpinBox->setMinimumHeight(46);
@@ -487,63 +500,52 @@ QWidget *ControlUI::createNetworkPage() {
     portColumn->setContentsMargins(0, 0, 0, 0);
     portColumn->setSpacing(8);
 
-    auto *portLabel = new QLabel("Bind Port", networkCard);
+    auto *portLabel = new QLabel("Bind Port", udpSettingsContainer);
     portLabel->setObjectName("ControlLabel");
     portColumn->addWidget(portLabel);
     portColumn->addWidget(portSpinBox);
-    portRow->addLayout(portColumn, 1);
+    portRow->addLayout(portColumn);
+    networkUdpWidgets.append(portLabel);
+    networkUdpWidgets.append(portSpinBox);
+    portRow->addStretch(1);
+    udpLayout->addLayout(portRow);
 
-    applyReceiverButton = new QPushButton("Apply Input Settings", networkCard);
-    applyReceiverButton->setObjectName("PrimaryButton");
-    applyReceiverButton->setMinimumHeight(46);
-    applyReceiverButton->setMinimumWidth(220);
-    connect(applyReceiverButton, &QPushButton::clicked, this, &ControlUI::onApplyReceiverSettings);
-    portRow->addWidget(applyReceiverButton, 0, Qt::AlignBottom);
-    networkLayout->addLayout(portRow);
-
-    receiverStatusLabel = new QLabel("Receiver: waiting for input status", networkCard);
-    receiverStatusLabel->setObjectName("StatusText");
-    receiverStatusLabel->setWordWrap(true);
-    networkLayout->addWidget(receiverStatusLabel);
-
-    auto *networkHint = new QLabel("Applying settings clears pending receiver-side data and switches the active input path without restarting the whole application.", networkCard);
-    networkHint->setObjectName("HintLabel");
-    networkHint->setWordWrap(true);
-    networkLayout->addWidget(networkHint);
-
-    npcapModeCheckBox = new QCheckBox("Enable Npcap Diagnostic Capture", networkCard);
+    npcapModeCheckBox = new QCheckBox("Enable Npcap Diagnostic Capture", udpSettingsContainer);
     connect(npcapModeCheckBox, &QCheckBox::toggled, this, [this](bool) {
         onSourceModeChanged(sourceModeComboBox ? sourceModeComboBox->currentIndex() : 0);
     });
-    networkLayout->addWidget(npcapModeCheckBox);
+    udpLayout->addWidget(npcapModeCheckBox);
+    networkUdpWidgets.append(npcapModeCheckBox);
 
-    auto *npcapLabel = new QLabel("Npcap Interface", networkCard);
+    auto *npcapLabel = new QLabel("Npcap Interface", udpSettingsContainer);
     npcapLabel->setObjectName("ControlLabel");
-    networkLayout->addWidget(npcapLabel);
+    udpLayout->addWidget(npcapLabel);
+    networkUdpWidgets.append(npcapLabel);
 
-    npcapInterfaceEdit = new QLineEdit(QString::fromUtf8("以太网 4"), networkCard);
-    npcapInterfaceEdit->setPlaceholderText("以太网 4");
+    npcapInterfaceEdit = new QLineEdit(QString::fromUtf8("以太网 4"), udpSettingsContainer);
+    npcapInterfaceEdit->setPlaceholderText(QString::fromUtf8("以太网 4"));
     npcapInterfaceEdit->setMinimumHeight(46);
-    networkLayout->addWidget(npcapInterfaceEdit);
+    udpLayout->addWidget(npcapInterfaceEdit);
 
-    auto *npcapHint = new QLabel("Use this when the FPGA stream is only visible in promiscuous/capture mode. The bind address is then informational, while the UDP destination port filter still applies.", networkCard);
+    auto *npcapHint = new QLabel("Use this when the FPGA stream is only visible in promiscuous or capture mode. The bind address becomes informational, while the UDP destination port filter still applies.", udpSettingsContainer);
     npcapHint->setObjectName("HintLabel");
     npcapHint->setWordWrap(true);
-    networkLayout->addWidget(npcapHint);
+    udpLayout->addWidget(npcapHint);
 
-    auto *usbDivider = new QFrame(networkCard);
-    usbDivider->setFrameShape(QFrame::HLine);
-    usbDivider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
-    networkLayout->addWidget(usbDivider);
+    networkUdpWidgets.append(npcapInterfaceEdit);
+    networkUdpWidgets.append(npcapHint);
 
     usbSettingsContainer = new QWidget(networkCard);
     auto *usbLayout = new QVBoxLayout(usbSettingsContainer);
     usbLayout->setContentsMargins(0, 0, 0, 0);
     usbLayout->setSpacing(12);
+    networkLayout->addWidget(usbSettingsContainer);
+    networkUsbWidgets.append(usbSettingsContainer);
 
     auto *usbSectionTitle = new QLabel("FT601 USB Options", usbSettingsContainer);
     usbSectionTitle->setObjectName("ControlLabel");
     usbLayout->addWidget(usbSectionTitle);
+    networkUsbWidgets.append(usbSectionTitle);
 
     auto *usbLabel = new QLabel("FT601 Device Match", usbSettingsContainer);
     usbLabel->setObjectName("ControlLabel");
@@ -553,6 +555,8 @@ QWidget *ControlUI::createNetworkPage() {
     usbDeviceMatchEdit->setPlaceholderText("FT601");
     usbDeviceMatchEdit->setMinimumHeight(46);
     usbLayout->addWidget(usbDeviceMatchEdit);
+    networkUsbWidgets.append(usbLabel);
+    networkUsbWidgets.append(usbDeviceMatchEdit);
 
     auto *usbRow = new QHBoxLayout();
     usbRow->setContentsMargins(0, 0, 0, 0);
@@ -572,6 +576,8 @@ QWidget *ControlUI::createNetworkPage() {
     usbPipeColumn->addWidget(usbPipeLabel);
     usbPipeColumn->addWidget(usbPipeSpinBox);
     usbRow->addLayout(usbPipeColumn, 1);
+    networkUsbWidgets.append(usbPipeLabel);
+    networkUsbWidgets.append(usbPipeSpinBox);
 
     auto *usbTransferColumn = new QVBoxLayout();
     usbTransferColumn->setContentsMargins(0, 0, 0, 0);
@@ -586,6 +592,8 @@ QWidget *ControlUI::createNetworkPage() {
     usbTransferColumn->addWidget(usbTransferLabel);
     usbTransferColumn->addWidget(usbTransferSpinBox);
     usbRow->addLayout(usbTransferColumn, 1);
+    networkUsbWidgets.append(usbTransferLabel);
+    networkUsbWidgets.append(usbTransferSpinBox);
 
     usbLayout->addLayout(usbRow);
 
@@ -593,36 +601,62 @@ QWidget *ControlUI::createNetworkPage() {
     usbHint->setObjectName("HintLabel");
     usbHint->setWordWrap(true);
     usbLayout->addWidget(usbHint);
-    networkLayout->addWidget(usbSettingsContainer);
+    networkUsbWidgets.append(usbHint);
 
-    auto *divider = new QFrame(networkCard);
-    divider->setFrameShape(QFrame::HLine);
-    divider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
-    networkLayout->addWidget(divider);
+    auto *udpDemoDivider = new QFrame(udpSettingsContainer);
+    udpDemoDivider->setFrameShape(QFrame::HLine);
+    udpDemoDivider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
+    udpLayout->addWidget(udpDemoDivider);
+    networkUdpWidgets.append(udpDemoDivider);
 
     auto *demoHeader = new QHBoxLayout();
     demoHeader->setContentsMargins(0, 0, 0, 0);
     demoHeader->setSpacing(12);
 
-    auto *demoLabel = new QLabel("Local Demo", networkCard);
+    auto *demoLabel = new QLabel("Local Demo", udpSettingsContainer);
     demoLabel->setObjectName("ControlLabel");
     demoHeader->addWidget(demoLabel);
     demoHeader->addStretch();
 
-    demoModeCheckBox = new QCheckBox("Enable Built-in UDP Demo", networkCard);
+    demoModeCheckBox = new QCheckBox("Enable Built-in UDP Demo", udpSettingsContainer);
     connect(demoModeCheckBox, &QCheckBox::toggled, this, &ControlUI::onDemoModeChanged);
     demoHeader->addWidget(demoModeCheckBox, 0, Qt::AlignRight);
-    networkLayout->addLayout(demoHeader);
+    udpLayout->addLayout(demoHeader);
+    networkUdpWidgets.append(demoLabel);
+    networkUdpWidgets.append(demoModeCheckBox);
 
-    demoStatusLabel = new QLabel("Demo is disabled.", networkCard);
+    demoStatusLabel = new QLabel("Demo is disabled.", udpSettingsContainer);
     demoStatusLabel->setObjectName("StatusText");
     demoStatusLabel->setWordWrap(true);
-    networkLayout->addWidget(demoStatusLabel);
+    udpLayout->addWidget(demoStatusLabel);
+    networkUdpWidgets.append(demoStatusLabel);
 
-    auto *demoHint = new QLabel("Use this to inject protocol-compatible local UDP traffic without restarting the app.", networkCard);
+    auto *demoHint = new QLabel("Use this to inject protocol-compatible local UDP traffic without restarting the app.", udpSettingsContainer);
     demoHint->setObjectName("HintLabel");
     demoHint->setWordWrap(true);
-    networkLayout->addWidget(demoHint);
+    udpLayout->addWidget(demoHint);
+    networkUdpWidgets.append(demoHint);
+
+    auto *footerDivider = new QFrame(networkCard);
+    footerDivider->setFrameShape(QFrame::HLine);
+    footerDivider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
+    networkLayout->addWidget(footerDivider);
+
+    applyReceiverButton = new QPushButton("Apply Input Settings", networkCard);
+    applyReceiverButton->setObjectName("PrimaryButton");
+    applyReceiverButton->setMinimumHeight(46);
+    connect(applyReceiverButton, &QPushButton::clicked, this, &ControlUI::onApplyReceiverSettings);
+    networkLayout->addWidget(applyReceiverButton);
+
+    receiverStatusLabel = new QLabel("Receiver: waiting for input status", networkCard);
+    receiverStatusLabel->setObjectName("StatusText");
+    receiverStatusLabel->setWordWrap(true);
+    networkLayout->addWidget(receiverStatusLabel);
+
+    auto *networkHint = new QLabel("Applying settings clears pending receiver-side data and switches the active input path without restarting the whole application.", networkCard);
+    networkHint->setObjectName("HintLabel");
+    networkHint->setWordWrap(true);
+    networkLayout->addWidget(networkHint);
 
     layout->addWidget(networkCard);
     layout->addStretch(1);
@@ -900,12 +934,24 @@ void ControlUI::onSourceModeChanged(int index) {
     const bool usingFt601 = (sourceModeComboBox->currentData().toInt() == 2);
     const bool usingNpcap = (!usingFt601 && npcapModeCheckBox->isChecked());
 
-    npcapModeCheckBox->setEnabled(!usingFt601);
-    npcapInterfaceEdit->setEnabled(usingNpcap);
-    addressEdit->setEnabled(!usingFt601);
+    for (int i = 0; i < networkUdpWidgets.size(); ++i) {
+        if (networkUdpWidgets[i] != nullptr) {
+            networkUdpWidgets[i]->setVisible(!usingFt601);
+        }
+    }
+    for (int i = 0; i < networkUsbWidgets.size(); ++i) {
+        if (networkUsbWidgets[i] != nullptr) {
+            networkUsbWidgets[i]->setVisible(usingFt601);
+        }
+    }
+
     if (usbSettingsContainer != nullptr) {
         usbSettingsContainer->setVisible(usingFt601);
     }
+
+    npcapModeCheckBox->setEnabled(!usingFt601);
+    npcapInterfaceEdit->setEnabled(usingNpcap);
+    addressEdit->setEnabled(!usingFt601);
     usbDeviceMatchEdit->setEnabled(usingFt601);
     usbPipeSpinBox->setEnabled(usingFt601);
     usbTransferSpinBox->setEnabled(usingFt601);

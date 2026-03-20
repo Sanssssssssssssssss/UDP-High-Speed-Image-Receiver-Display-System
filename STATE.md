@@ -17,6 +17,7 @@
 - Hardware bring-up has improved from "zero visible traffic" to "some data visible", but the user still reports severe packet loss and unstable image reception.
 - The software now supports a third ingress mode, `FT601 USB`, alongside `UDP Socket` and `Npcap Diagnostic`.
 - The Network page now exposes only two operator-facing input choices, `UDP Socket` and `FT601 USB`; Npcap is a separate optional diagnostic toggle under the UDP path.
+- The Network page layout now groups UDP-only controls and FT601-only controls into separate containers, with shared apply/status controls anchored below them to avoid overlap during source switches.
 - The FT601 path is currently a software scaffold: ingress-mode wiring, UI controls, runtime `FTD3XX.dll` checks, and a host-side packetizer are in place.
 - The FT601 host-side packetizer is designed around `804-byte` logical packets made of a 4-byte sync header `55 33 11 77` plus the unchanged `800-byte` payload packet semantics.
 - The real FT601 D3XX device open/read loop is still pending.
@@ -28,7 +29,7 @@
 - Current hardware risk is no longer only "no traffic at all"; it has shifted to "some traffic is visible, but loss is severe and the exact choke point is still unknown."
 
 ## Immediate Next Step
-- Use the installed Npcap path to compare socket-mode loss vs capture-mode loss on the live FPGA link, while keeping the FT601 ingress scaffold ready for future USB-based FPGA output.
+- Re-test the live hardware path after the Network page layout fix, then compare socket-mode loss vs capture-mode loss on the installed Npcap path while keeping the FT601 ingress scaffold ready for future USB-based FPGA output.
 
 ## Risks
 - The exact external packet/frame specification is still not fully formalized in-repo.

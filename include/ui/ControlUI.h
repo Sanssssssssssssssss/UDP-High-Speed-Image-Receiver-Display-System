@@ -94,6 +94,8 @@ private:
     QGridLayout *pageButtonLayout;
     QList<QPushButton *> pageButtons;
     QStackedWidget *pageStack;
+    QList<QWidget *> networkUdpWidgets;
+    QList<QWidget *> networkUsbWidgets;
 
     QSlider *brightnessSlider;
     QLabel *brightnessValueLabel;
@@ -113,6 +115,7 @@ private:
     QComboBox *formatComboBox;
 
     QComboBox *sourceModeComboBox;
+    QWidget *udpSettingsContainer;
     QWidget *usbSettingsContainer;
     QLineEdit *addressEdit;
     QSpinBox *portSpinBox;
