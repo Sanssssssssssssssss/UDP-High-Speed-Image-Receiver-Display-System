@@ -26,12 +26,17 @@
 - [ ] Benchmark real-scene end-to-end AI latency after the new raw-RGB helper transport and provider-selection changes.
 - [ ] Decide whether to keep the current Python+DirectML path as the near-term deployment target or replace it with a native C++ ONNX Runtime integration.
 - [ ] Validate that the FPGA path produces actual RX traffic on the ASIX USB Ethernet adapter and confirm the target IP/port or capture mode assumptions before further Qt-side receiver changes.
-- [ ] Install Npcap on the hardware test machine and validate the new diagnostic capture mode on `以太网 4`.
+- [ ] Validate the new diagnostic capture mode on the ASIX USB Ethernet adapter and compare socket-mode loss vs capture-mode loss under real FPGA traffic.
+- [ ] Implement the real FT601 D3XX open/read loop behind the new USB ingress scaffold.
+- [ ] Validate FT601 sync-header packetization against a host-side replay stream before FPGA bring-up.
+- [ ] Validate the FT601 USB ingress path on real hardware once FPGA-side FT601 output is available.
+- [ ] Freeze and share the FT601 FPGA-to-host interface contract documented in `docs/plans/2026-03-20-ft601-usb-ingress-design.md`.
 
 ## In Progress
 - [ ] Receiver-side hot-path optimization under immutable UDP protocol constraints.
-- [ ] Hardware bring-up debugging for the ASIX USB Ethernet link, which currently shows zero RX packets during attempted FPGA streaming.
+- [ ] Hardware bring-up debugging for the ASIX USB Ethernet link, which currently shows severe packet loss during attempted FPGA streaming.
 - [ ] Npcap diagnostic ingress integration and bring-up validation.
+- [ ] FT601 USB ingress scaffold and interface-contract definition.
 
 ## Completed
 - [x] Clone upstream repository into `D:\GPT_Project\UDP-High-Speed-Image-Receiver-Display-System`.
@@ -93,6 +98,8 @@
 - [x] Remove PNG round-trips from the Python ONNX helper path and replace them with raw RGB24 transport.
 - [x] Teach the Python ONNX helper to report and prefer the fastest available execution provider while keeping a tuned CPU fallback.
 - [x] Enable `onnxruntime-directml` on the local Intel Arc machine so the helper can use `DmlExecutionProvider` instead of CPU-only inference.
+- [x] Add an optional Npcap diagnostic ingress path that feeds captured UDP payloads into the unchanged parser.
+- [x] Add a third ingress mode scaffold for future FT601 USB receive and document the initial FPGA-to-host interface contract.
 
 ## Blocked
 - [ ] Protocol validation is blocked on missing formal packet/frame specification.

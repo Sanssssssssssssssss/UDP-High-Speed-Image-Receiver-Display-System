@@ -68,6 +68,8 @@ UdpFramePipelineWorker::UdpFramePipelineWorker(QObject *parent)
     : QObject(parent),
       receiver(nullptr),
       receiverThread(nullptr),
+      ft601Receiver(nullptr),
+      ft601Thread(nullptr),
       yoloProcessor(nullptr),
       yoloThread(nullptr),
       recorderWorker(nullptr),
@@ -82,8 +84,11 @@ UdpFramePipelineWorker::UdpFramePipelineWorker(QObject *parent)
       lutDirty(true),
       receiverAddress("0.0.0.0"),
       receiverPort(8080),
-      receiverUseNpcap(false),
+      receiverMode(IngressMode::UdpSocket),
       receiverNpcapInterface(QString::fromUtf8("以太网 4")),
+      receiverUsbDeviceMatch("FT601"),
+      receiverUsbPipeId(0x82),
+      receiverUsbTransferBytes(16384),
       aiDetectionEnabled(false),
       aiStatusText("AI detection is disabled."),
       lastInferenceMs(0),
@@ -167,13 +172,26 @@ void UdpFramePipelineWorker::start() {
     receiver = new UdpReceiver();
     receiverThread = new QThread();
     receiver->moveToThread(receiverThread);
-    connect(receiverThread, &QThread::started, receiver, [this]() { receiver->startReceiving(receiverAddress, receiverPort, receiverUseNpcap, receiverNpcapInterface); });
     connect(receiver, &UdpReceiver::newFrameBatch, this, &UdpFramePipelineWorker::enqueueFrameBatch, Qt::DirectConnection);
     connect(receiver, &UdpReceiver::receiverBindingChanged, this, &UdpFramePipelineWorker::onReceiverBindingChanged, Qt::QueuedConnection);
     connect(receiverThread, &QThread::finished, receiver, &QObject::deleteLater);
     receiverThread->start();
 
-    emit receiverSettingsChanged(receiverAddress, receiverPort, receiverUseNpcap, receiverNpcapInterface);
+    ft601Receiver = new Ft601Receiver();
+    ft601Thread = new QThread();
+    ft601Receiver->moveToThread(ft601Thread);
+    connect(ft601Receiver, &Ft601Receiver::newFrameBatch, this, &UdpFramePipelineWorker::enqueueFrameBatch, Qt::DirectConnection);
+    connect(ft601Receiver, &Ft601Receiver::receiverStatusChanged, this, &UdpFramePipelineWorker::onFt601StatusChanged, Qt::QueuedConnection);
+    connect(ft601Thread, &QThread::finished, ft601Receiver, &QObject::deleteLater);
+    ft601Thread->start();
+
+    applyReceiverSettings(receiverAddress,
+                          receiverPort,
+                          receiverMode,
+                          receiverNpcapInterface,
+                          receiverUsbDeviceMatch,
+                          receiverUsbPipeId,
+                          receiverUsbTransferBytes);
     emit aiStatusChanged(aiStatusText);
     emit frameReady(displayBuffers[frontDisplayIndex]);
 }
@@ -189,11 +207,22 @@ void UdpFramePipelineWorker::shutdown() {
         QMetaObject::invokeMethod(receiver, "stopReceiving", Qt::BlockingQueuedConnection);
     }
 
+    if (ft601Receiver != nullptr) {
+        QMetaObject::invokeMethod(ft601Receiver, "stopReceiving", Qt::BlockingQueuedConnection);
+    }
+
     if (receiverThread != nullptr) {
         receiverThread->quit();
         receiverThread->wait();
         receiverThread = nullptr;
         receiver = nullptr;
+    }
+
+    if (ft601Thread != nullptr) {
+        ft601Thread->quit();
+        ft601Thread->wait();
+        ft601Thread = nullptr;
+        ft601Receiver = nullptr;
     }
 
     if (yoloThread != nullptr) {
@@ -320,14 +349,23 @@ void UdpFramePipelineWorker::setDenoise(int value) {
     refreshDisplayFromRaw();
 }
 
-void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface) {
+void UdpFramePipelineWorker::applyReceiverSettings(const QString &address,
+                                                   quint16 port,
+                                                   int mode,
+                                                   const QString &npcapInterface,
+                                                   const QString &usbDeviceMatch,
+                                                   int usbPipeId,
+                                                   int usbTransferBytes) {
     receiverAddress = address.trimmed();
     receiverPort = port;
-    receiverUseNpcap = useNpcap;
+    receiverMode = mode;
     receiverNpcapInterface = npcapInterface.trimmed();
     if (receiverNpcapInterface.isEmpty()) {
         receiverNpcapInterface = QString::fromUtf8("以太网 4");
     }
+    receiverUsbDeviceMatch = usbDeviceMatch.trimmed().isEmpty() ? QString("FT601") : usbDeviceMatch.trimmed();
+    receiverUsbPipeId = usbPipeId;
+    receiverUsbTransferBytes = usbTransferBytes;
     resetParserState(true);
     rawImage.fill(Qt::black);
     displayBuffers[0].fill(Qt::black);
@@ -337,18 +375,45 @@ void UdpFramePipelineWorker::applyReceiverSettings(const QString &address, quint
     lastInferenceMs = 0;
 
     emit frameReady(displayBuffers[frontDisplayIndex]);
-    emit receiverStatusChanged(receiverUseNpcap
-                                   ? QString("Rebinding receiver via Npcap on %1 | UDP dport=%2 ...").arg(receiverNpcapInterface).arg(receiverPort)
-                                   : QString("Rebinding receiver to %1:%2 ...").arg(receiverAddress).arg(receiverPort));
-    emit receiverSettingsChanged(receiverAddress, receiverPort, receiverUseNpcap, receiverNpcapInterface);
+    if (receiverMode == IngressMode::NpcapDiagnostic) {
+        emit receiverStatusChanged(QString("Rebinding receiver via Npcap on %1 | UDP dport=%2 ...").arg(receiverNpcapInterface).arg(receiverPort));
+    } else if (receiverMode == IngressMode::Ft601Usb) {
+        emit receiverStatusChanged(QString("Switching receiver to FT601 USB | device=%1 | pipe=0x%2 | transfer=%3 bytes ...")
+                                       .arg(receiverUsbDeviceMatch)
+                                       .arg(receiverUsbPipeId, 2, 16, QLatin1Char('0'))
+                                       .arg(receiverUsbTransferBytes));
+    } else {
+        emit receiverStatusChanged(QString("Rebinding receiver to %1:%2 ...").arg(receiverAddress).arg(receiverPort));
+    }
+    emit receiverSettingsChanged(receiverAddress,
+                                 receiverPort,
+                                 receiverMode,
+                                 receiverNpcapInterface,
+                                 receiverUsbDeviceMatch,
+                                 receiverUsbPipeId,
+                                 receiverUsbTransferBytes);
 
     if (receiver != nullptr) {
+        QMetaObject::invokeMethod(receiver, "stopReceiving", Qt::QueuedConnection);
+    }
+    if (ft601Receiver != nullptr) {
+        QMetaObject::invokeMethod(ft601Receiver, "stopReceiving", Qt::QueuedConnection);
+    }
+
+    if (receiverMode == IngressMode::Ft601Usb && ft601Receiver != nullptr) {
+        QMetaObject::invokeMethod(ft601Receiver,
+                                  "startReceiving",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(QString, receiverUsbDeviceMatch),
+                                  Q_ARG(int, receiverUsbPipeId),
+                                  Q_ARG(int, receiverUsbTransferBytes));
+    } else if (receiver != nullptr) {
         QMetaObject::invokeMethod(receiver,
                                   "startReceiving",
                                   Qt::QueuedConnection,
                                   Q_ARG(QString, receiverAddress),
                                   Q_ARG(quint16, receiverPort),
-                                  Q_ARG(bool, receiverUseNpcap),
+                                  Q_ARG(bool, receiverMode == IngressMode::NpcapDiagnostic),
                                   Q_ARG(QString, receiverNpcapInterface));
     }
 }
@@ -523,6 +588,10 @@ void UdpFramePipelineWorker::drainPendingBatches() {
 void UdpFramePipelineWorker::onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message) {
     Q_UNUSED(address);
     Q_UNUSED(port);
+    emit receiverStatusChanged(ok ? message : QString("Receiver error: %1").arg(message));
+}
+
+void UdpFramePipelineWorker::onFt601StatusChanged(bool ok, const QString &message) {
     emit receiverStatusChanged(ok ? message : QString("Receiver error: %1").arg(message));
 }
 

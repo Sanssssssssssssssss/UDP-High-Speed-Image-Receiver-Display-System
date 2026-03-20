@@ -69,6 +69,11 @@
 - The system shall provide an operator-selectable diagnostic receive mode that can use Npcap on Windows to capture Ethernet traffic from a chosen interface, extract UDP payloads for the configured destination port, and feed those payloads into the existing frame parser without changing protocol semantics.
 - Reason: the user explicitly requested a way to test real FPGA traffic when standard host-addressed UDP receive may not see packets unless capture/promiscuous mode is used.
 
+### FR-015 Optional FT601 USB ingress path
+- Status: Confirmed
+- The system shall provide an operator-selectable FT601 USB ingress mode that converts a future FT601/D3XX byte stream into the same logical packet batches consumed by the current parser, without changing the existing `0xAA -> line payload -> 0xBB` semantics.
+- Reason: the user explicitly requested a future USB image-transfer option for FPGA hardware while keeping the current unpacking logic reusable.
+
 ## 3. Non-Functional Requirements
 
 ### NFR-001 Maintainability
@@ -101,6 +106,7 @@
 - Do not replace the current Qt/C++ stack without explicit approval.
 - Do not change the upstream UDP packet format, sender-side construction flow, or pixel transfer semantics; optimization is limited to the receiver-side implementation.
 - Do not assume the presence of protocol fields that are not actually carried on the wire; in particular, the current UDP line packets must be treated as sequential payloads without an explicit line index unless the user confirms otherwise.
+- Any future FT601 USB ingress path must preserve parser semantics by adapting the USB byte stream at the ingress boundary rather than redefining frame-start, line-payload, or frame-end payload meaning.
 
 ## 5. Acceptance Criteria For First Runnable Version
 - The project builds in a documented local environment.

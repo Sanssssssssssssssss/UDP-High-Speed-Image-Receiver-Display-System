@@ -1,6 +1,8 @@
 #ifndef UDP_FRAME_PIPELINE_WORKER_H
 #define UDP_FRAME_PIPELINE_WORKER_H
 
+#include "Ft601Receiver.h"
+#include "IngressMode.h"
 #include "UdpReceiver.h"
 #include "VideoRecorderWorker.h"
 #include "YoloProcessor.h"
@@ -25,7 +27,13 @@ signals:
     void recordingStateChanged(bool isRecording);
     void statsReady(const QString &statsText);
     void receiverStatusChanged(const QString &statusText);
-    void receiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
+    void receiverSettingsChanged(const QString &address,
+                                 quint16 port,
+                                 int mode,
+                                 const QString &npcapInterface,
+                                 const QString &usbDeviceMatch,
+                                 int usbPipeId,
+                                 int usbTransferBytes);
     void aiStatusChanged(const QString &statusText);
     void recordFrameReady(const QImage &frame);
     void startRecordingRequested(const QString &directory, const QString &format, int fps, const QSize &frameSize);
@@ -42,7 +50,13 @@ public slots:
     void setGamma(int value);
     void setSharpness(int value);
     void setDenoise(int value);
-    void applyReceiverSettings(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
+    void applyReceiverSettings(const QString &address,
+                               quint16 port,
+                               int mode,
+                               const QString &npcapInterface,
+                               const QString &usbDeviceMatch,
+                               int usbPipeId,
+                               int usbTransferBytes);
     void setAiDetectionEnabled(bool enabled);
 
 private slots:
@@ -50,6 +64,7 @@ private slots:
     void enqueueFrameBatch(const QList<QByteArray> &batch);
     void drainPendingBatches();
     void onReceiverBindingChanged(const QString &address, quint16 port, bool ok, const QString &message);
+    void onFt601StatusChanged(bool ok, const QString &message);
     void onYoloDetectionsReady(const QVector<QRect> &boxes, int inferenceMs);
     void onYoloStatusChanged(const QString &statusText);
 
@@ -78,6 +93,8 @@ private:
 
     UdpReceiver *receiver;
     QThread *receiverThread;
+    Ft601Receiver *ft601Receiver;
+    QThread *ft601Thread;
 
     YoloProcessor *yoloProcessor;
     QThread *yoloThread;
@@ -98,8 +115,11 @@ private:
 
     QString receiverAddress;
     quint16 receiverPort;
-    bool receiverUseNpcap;
+    int receiverMode;
     QString receiverNpcapInterface;
+    QString receiverUsbDeviceMatch;
+    int receiverUsbPipeId;
+    int receiverUsbTransferBytes;
     bool aiDetectionEnabled;
     QString aiStatusText;
     int lastInferenceMs;

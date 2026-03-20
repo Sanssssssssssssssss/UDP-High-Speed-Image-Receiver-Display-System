@@ -12,6 +12,7 @@ SOURCES += \
     main.cpp \
     src/app/ApplicationLauncher.cpp \
     src/inference/YoloProcessor.cpp \
+    src/network/Ft601Receiver.cpp \
     src/network/UdpReceiver.cpp \
     src/processing/UdpFramePipelineWorker.cpp \
     src/processing/UdpFrameProcessor.cpp \
@@ -21,6 +22,8 @@ SOURCES += \
 HEADERS += \
     include/app/ApplicationLauncher.h \
     include/inference/YoloProcessor.h \
+    include/network/Ft601Receiver.h \
+    include/network/IngressMode.h \
     include/network/UdpReceiver.h \
     include/processing/UdpFramePipelineWorker.h \
     include/processing/UdpFrameProcessor.h \

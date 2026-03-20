@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QList>
 #include <QPushButton>
+#include <QComboBox>
 #include <QGridLayout>
 #include <QSlider>
 #include <QSpinBox>
@@ -30,7 +31,13 @@ signals:
     void gammaChanged(int value);
     void sharpnessChanged(int value);
     void denoiseChanged(int value);
-    void receiverSettingsRequested(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
+    void receiverSettingsRequested(const QString &address,
+                                   quint16 port,
+                                   int mode,
+                                   const QString &npcapInterface,
+                                   const QString &usbDeviceMatch,
+                                   int usbPipeId,
+                                   int usbTransferBytes);
     void aiDetectionToggled(bool enabled);
     void demoModeRequested(bool enabled);
 
@@ -39,7 +46,13 @@ public slots:
     void onFPSChanged(int fps);
     void onPerformanceStatsChanged(const QString &statsText);
     void onReceiverStatusChanged(const QString &statusText);
-    void onReceiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface);
+    void onReceiverSettingsChanged(const QString &address,
+                                   quint16 port,
+                                   int mode,
+                                   const QString &npcapInterface,
+                                   const QString &usbDeviceMatch,
+                                   int usbPipeId,
+                                   int usbTransferBytes);
     void onAiStatusChanged(const QString &statusText);
     void onDemoStateChanged(bool enabled, const QString &statusText);
 
@@ -54,6 +67,7 @@ private slots:
     void onFlipHorizontalChanged(bool checked);
     void onFlipVerticalChanged(bool checked);
     void onApplyReceiverSettings();
+    void onSourceModeChanged(int index);
     void onAiDetectionChanged(bool checked);
     void onDemoModeChanged(bool checked);
 
@@ -97,10 +111,14 @@ private:
     QLabel *saveDirectoryLabel;
     QComboBox *formatComboBox;
 
+    QComboBox *sourceModeComboBox;
     QLineEdit *addressEdit;
     QSpinBox *portSpinBox;
     QCheckBox *npcapModeCheckBox;
     QLineEdit *npcapInterfaceEdit;
+    QLineEdit *usbDeviceMatchEdit;
+    QSpinBox *usbPipeSpinBox;
+    QSpinBox *usbTransferSpinBox;
     QLabel *receiverStatusLabel;
     QPushButton *applyReceiverButton;
     QCheckBox *demoModeCheckBox;

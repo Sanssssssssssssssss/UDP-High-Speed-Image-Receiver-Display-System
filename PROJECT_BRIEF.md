@@ -15,6 +15,7 @@
 - Clarify actual protocol, frame format, and runtime dependencies.
 - Make the project buildable and runnable in a documented local development environment.
 - Add a runnable demo path to validate the software even when dedicated hardware is unavailable.
+- Add alternate host-side ingress paths that preserve the same frame parser semantics when future hardware links require them, including an FT601-based USB path.
 - Improve maintainability, configuration, logging, and testability without breaking the baseline workflow.
 - Continuously optimize hot paths with performance-first tradeoffs when they remain maintainable and measurable.
 
@@ -45,3 +46,4 @@
 - Is tshark a hard requirement or only a temporary debugging aid?
 - Which first demo matters most: hardware-connected demo or local simulator demo?
 - Which inference acceleration targets matter later: CPU-only, OpenCV DNN, CUDA, TensorRT, or another backend?
+- What exact FT601/D3XX receive contract should the FPGA-side USB image transmitter implement so the desktop parser can stay unchanged?

@@ -263,3 +263,15 @@
 - Date: 2026-03-20
 - Decision: keep the existing `QUdpSocket` receive path as the default, but add an operator-selectable Windows-only Npcap diagnostic mode that captures Ethernet traffic promiscuously on a chosen interface, filters by UDP destination port, extracts the UDP payload, and feeds that payload into the unchanged `AA -> line payload -> BB` parser.
 - Reason: real FPGA bring-up on the USB Ethernet adapter currently shows zero packets at the standard UDP socket layer, and the user explicitly wants to test whether packets are only visible through a capture-style path similar to Wireshark/Npcap.
+
+## D-045 Support multiple ingress adapters behind one parser
+- Status: Accepted
+- Date: 2026-03-20
+- Decision: expose ingress selection at the control surface and keep UDP socket, Npcap diagnostic capture, and FT601 USB as interchangeable ingress adapters that all feed the same downstream parser contract.
+- Reason: the user wants a future USB image-transfer option, but the current frame-reconstruction semantics must remain unchanged across transport layers.
+
+## D-046 Define FT601 USB framing as sync-header plus immutable payload packet
+- Status: Accepted
+- Date: 2026-03-20
+- Decision: the FT601 path shall transport a continuous byte stream composed of repeated `804-byte` logical packets, where bytes `0..3` are the sync header `55 33 11 77` and bytes `4..803` are the existing `800-byte` payload packet whose `0xAA -> line payload -> 0xBB` meaning stays unchanged.
+- Reason: FT601 bulk reads do not preserve UDP datagram boundaries, so the host needs a minimal framing shim while the payload semantics remain identical to the proven parser path.

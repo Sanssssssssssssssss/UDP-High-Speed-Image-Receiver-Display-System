@@ -59,10 +59,14 @@ ControlUI::ControlUI(QWidget *parent)
       browseButton(nullptr),
       saveDirectoryLabel(nullptr),
       formatComboBox(nullptr),
+      sourceModeComboBox(nullptr),
       addressEdit(nullptr),
       portSpinBox(nullptr),
       npcapModeCheckBox(nullptr),
       npcapInterfaceEdit(nullptr),
+      usbDeviceMatchEdit(nullptr),
+      usbPipeSpinBox(nullptr),
+      usbTransferSpinBox(nullptr),
       receiverStatusLabel(nullptr),
       applyReceiverButton(nullptr),
       demoModeCheckBox(nullptr),
@@ -441,6 +445,17 @@ QWidget *ControlUI::createNetworkPage() {
     auto *networkLayout = qobject_cast<QVBoxLayout *>(networkCard->layout());
     networkLayout->setSpacing(12);
 
+    auto *sourceLabel = new QLabel("Ingress Source", networkCard);
+    sourceLabel->setObjectName("ControlLabel");
+    networkLayout->addWidget(sourceLabel);
+
+    sourceModeComboBox = new QComboBox(networkCard);
+    sourceModeComboBox->addItem("UDP Socket", 0);
+    sourceModeComboBox->addItem("Npcap Diagnostic", 1);
+    sourceModeComboBox->addItem("FT601 USB", 2);
+    connect(sourceModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(onSourceModeChanged(int)));
+    networkLayout->addWidget(sourceModeComboBox);
+
     addressEdit = new QLineEdit("0.0.0.0", networkCard);
     addressEdit->setPlaceholderText("0.0.0.0");
     addressEdit->setMinimumHeight(46);
@@ -504,6 +519,60 @@ QWidget *ControlUI::createNetworkPage() {
     npcapHint->setWordWrap(true);
     networkLayout->addWidget(npcapHint);
 
+    auto *usbDivider = new QFrame(networkCard);
+    usbDivider->setFrameShape(QFrame::HLine);
+    usbDivider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
+    networkLayout->addWidget(usbDivider);
+
+    auto *usbLabel = new QLabel("FT601 Device Match", networkCard);
+    usbLabel->setObjectName("ControlLabel");
+    networkLayout->addWidget(usbLabel);
+
+    usbDeviceMatchEdit = new QLineEdit("FT601", networkCard);
+    usbDeviceMatchEdit->setPlaceholderText("FT601");
+    usbDeviceMatchEdit->setMinimumHeight(46);
+    networkLayout->addWidget(usbDeviceMatchEdit);
+
+    auto *usbRow = new QHBoxLayout();
+    usbRow->setContentsMargins(0, 0, 0, 0);
+    usbRow->setSpacing(12);
+
+    auto *usbPipeColumn = new QVBoxLayout();
+    usbPipeColumn->setContentsMargins(0, 0, 0, 0);
+    usbPipeColumn->setSpacing(8);
+    auto *usbPipeLabel = new QLabel("FT601 Pipe", networkCard);
+    usbPipeLabel->setObjectName("ControlLabel");
+    usbPipeSpinBox = new QSpinBox(networkCard);
+    usbPipeSpinBox->setRange(0x80, 0x8F);
+    usbPipeSpinBox->setDisplayIntegerBase(16);
+    usbPipeSpinBox->setPrefix("0x");
+    usbPipeSpinBox->setValue(0x82);
+    usbPipeSpinBox->setMinimumHeight(46);
+    usbPipeColumn->addWidget(usbPipeLabel);
+    usbPipeColumn->addWidget(usbPipeSpinBox);
+    usbRow->addLayout(usbPipeColumn, 1);
+
+    auto *usbTransferColumn = new QVBoxLayout();
+    usbTransferColumn->setContentsMargins(0, 0, 0, 0);
+    usbTransferColumn->setSpacing(8);
+    auto *usbTransferLabel = new QLabel("Read Chunk Bytes", networkCard);
+    usbTransferLabel->setObjectName("ControlLabel");
+    usbTransferSpinBox = new QSpinBox(networkCard);
+    usbTransferSpinBox->setRange(804, 1 << 20);
+    usbTransferSpinBox->setSingleStep(804);
+    usbTransferSpinBox->setValue(16384);
+    usbTransferSpinBox->setMinimumHeight(46);
+    usbTransferColumn->addWidget(usbTransferLabel);
+    usbTransferColumn->addWidget(usbTransferSpinBox);
+    usbRow->addLayout(usbTransferColumn, 1);
+
+    networkLayout->addLayout(usbRow);
+
+    auto *usbHint = new QLabel("FT601 mode expects a continuous byte stream that can be sliced into 804-byte logical packets: 4-byte sync header + 800-byte payload with the same AA / line / BB semantics as UDP.", networkCard);
+    usbHint->setObjectName("HintLabel");
+    usbHint->setWordWrap(true);
+    networkLayout->addWidget(usbHint);
+
     auto *divider = new QFrame(networkCard);
     divider->setFrameShape(QFrame::HLine);
     divider->setStyleSheet("color: #26262a; background: #26262a; min-height: 1px; max-height: 1px;");
@@ -535,6 +604,7 @@ QWidget *ControlUI::createNetworkPage() {
 
     layout->addWidget(networkCard);
     layout->addStretch(1);
+    onSourceModeChanged(sourceModeComboBox->currentIndex());
     return page;
 }
 
@@ -630,11 +700,22 @@ void ControlUI::onReceiverStatusChanged(const QString &statusText) {
     receiverStatusLabel->setText(statusText);
 }
 
-void ControlUI::onReceiverSettingsChanged(const QString &address, quint16 port, bool useNpcap, const QString &npcapInterface) {
+void ControlUI::onReceiverSettingsChanged(const QString &address,
+                                          quint16 port,
+                                          int mode,
+                                          const QString &npcapInterface,
+                                          const QString &usbDeviceMatch,
+                                          int usbPipeId,
+                                          int usbTransferBytes) {
     addressEdit->setText(address);
     portSpinBox->setValue(static_cast<int>(port));
-    npcapModeCheckBox->setChecked(useNpcap);
+    sourceModeComboBox->setCurrentIndex(mode);
+    npcapModeCheckBox->setChecked(mode == 1);
     npcapInterfaceEdit->setText(npcapInterface);
+    usbDeviceMatchEdit->setText(usbDeviceMatch);
+    usbPipeSpinBox->setValue(usbPipeId);
+    usbTransferSpinBox->setValue(usbTransferBytes);
+    onSourceModeChanged(mode);
 }
 
 void ControlUI::onAiStatusChanged(const QString &statusText) {
@@ -753,20 +834,50 @@ void ControlUI::onApplyReceiverSettings() {
         return;
     }
 
-    const bool useNpcap = npcapModeCheckBox->isChecked();
+    const int mode = sourceModeComboBox->currentData().toInt();
     const QString npcapInterface = npcapInterfaceEdit->text().trimmed();
-    if (useNpcap && npcapInterface.isEmpty()) {
+    if (mode == 1 && npcapInterface.isEmpty()) {
         QMessageBox::warning(this, "Npcap Interface Required", "Please enter the Npcap interface name when diagnostic capture is enabled.");
         return;
     }
+    const QString usbDeviceMatch = usbDeviceMatchEdit->text().trimmed();
+    if (mode == 2 && usbDeviceMatch.isEmpty()) {
+        QMessageBox::warning(this, "FT601 Device Match Required", "Please enter the FT601 device match string before applying USB receiver settings.");
+        return;
+    }
 
-    receiverStatusLabel->setText(useNpcap
-                                     ? QString("Receiver: applying Npcap capture on %1 | UDP dport=%2 ...").arg(npcapInterface).arg(portSpinBox->value())
-                                     : QString("Receiver: applying %1:%2 ...").arg(address).arg(portSpinBox->value()));
+    if (mode == 1) {
+        receiverStatusLabel->setText(QString("Receiver: applying Npcap capture on %1 | UDP dport=%2 ...").arg(npcapInterface).arg(portSpinBox->value()));
+    } else if (mode == 2) {
+        receiverStatusLabel->setText(QString("Receiver: applying FT601 USB mode | device=%1 | pipe=0x%2 ...")
+                                         .arg(usbDeviceMatch)
+                                         .arg(usbPipeSpinBox->value(), 2, 16, QLatin1Char('0')));
+    } else {
+        receiverStatusLabel->setText(QString("Receiver: applying %1:%2 ...").arg(address).arg(portSpinBox->value()));
+    }
     emit receiverSettingsRequested(address,
                                    static_cast<quint16>(portSpinBox->value()),
-                                   useNpcap,
-                                   npcapInterface);
+                                   mode,
+                                   npcapInterface,
+                                   usbDeviceMatch,
+                                   usbPipeSpinBox->value(),
+                                   usbTransferSpinBox->value());
+}
+
+void ControlUI::onSourceModeChanged(int index) {
+    Q_UNUSED(index);
+
+    const int mode = sourceModeComboBox->currentData().toInt();
+    const bool usingNpcap = (mode == 1);
+    const bool usingFt601 = (mode == 2);
+
+    npcapModeCheckBox->setChecked(usingNpcap);
+    npcapModeCheckBox->setEnabled(false);
+    npcapInterfaceEdit->setEnabled(usingNpcap);
+    addressEdit->setEnabled(!usingFt601);
+    usbDeviceMatchEdit->setEnabled(usingFt601);
+    usbPipeSpinBox->setEnabled(usingFt601);
+    usbTransferSpinBox->setEnabled(usingFt601);
 }
 
 void ControlUI::onAiDetectionChanged(bool checked) {

@@ -152,6 +152,13 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: hardware debugging can now distinguish "no packets on the wire" from "packets exist but are not host-addressed UDP that `QUdpSocket` can see" without changing frame reconstruction semantics.
 - Validation: project rebuild succeeds; the app launches normally without Npcap installed; on machines missing `wpcap.dll`, the receiver reports an explicit runtime-missing status instead of crashing.
 
+### 2026-03-20 - Multi-ingress scaffold expanded for future FT601 USB receive
+- Area: Receive ingress architecture
+- Before: the pipeline could switch between normal UDP socket receive and Npcap diagnostic capture, but there was no software-side path for a future FT601 USB transport.
+- After: the Network page, processor forwarding layer, and pipeline worker now support a third ingress mode, `FT601 USB`. A new `Ft601Receiver` packetizes a continuous byte stream into `804-byte` logical packets using a `55 33 11 77` sync header plus the existing `800-byte` payload semantics, then emits the same packet batches consumed by the unchanged parser.
+- Expected Effect: FPGA USB transport can be added later without redesigning frame reconstruction; transport-specific framing stays at the ingress boundary while parser semantics remain stable.
+- Validation: project rebuild succeeds with the new ingress classes and expanded receiver-setting signatures; FT601 mode now reports runtime status and awaits real D3XX read-loop integration.
+
 ## Future Entries
 
 ### Template
