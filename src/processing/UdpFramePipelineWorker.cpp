@@ -901,11 +901,9 @@ void UdpFramePipelineWorker::composeDisplayFrame(bool submitAiFrame) {
         emit recordFrameReady(displayBuffers[frontDisplayIndex]);
     }
 
-    if (submitAiFrame && aiDetectionEnabled && yoloProcessor != nullptr) {
-        QMetaObject::invokeMethod(yoloProcessor,
-                                  "submitFrame",
-                                  Qt::QueuedConnection,
-                                  Q_ARG(QImage, rawImage.copy()));
+    if (submitAiFrame && aiDetectionEnabled && yoloProcessor != nullptr && yoloProcessor->wantsFrame()) {
+        // Call the thread-safe mailbox directly so Qt never queues a backlog of full-frame copies.
+        yoloProcessor->submitFrame(rawImage.copy());
     }
 }
 

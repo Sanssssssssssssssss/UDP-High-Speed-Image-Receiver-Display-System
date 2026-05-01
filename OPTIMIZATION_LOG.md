@@ -173,6 +173,20 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: cleaner source switching, better page stretch behavior, and less layout breakage when we add more FT601 or UDP diagnostics later.
 - Validation: project rebuild succeeds and the application survives a launch smoke test after the layout restructure.
 
+### 2026-05-01 - Python helper transport changed from base64 JSON to binary RGB24
+- Area: AI inference hot path
+- Before: each fallback inference request copied the RGB frame into a `QByteArray`, base64-expanded it into a large JSON string, then decoded that text back into bytes in Python.
+- After: `YoloProcessor` sends a compact JSON header followed by raw RGB24 bytes, and `onnx_helper.py` reads the binary payload directly while keeping the old base64 path for compatibility tests.
+- Expected Effect: lower frame handoff latency, lower allocation pressure, and lower CPU cost on both sides of the C++/Python process boundary.
+- Validation: `scripts/inference_helper_bench.py --provider CPUExecutionProvider --intra-threads 4 --iterations 120 --warmup-iterations 10` reduced round-trip mean from `33.38 ms` on the compatibility base64 path to `24.20 ms` on the binary path; the same benchmark with `DmlExecutionProvider` reduced round-trip mean from `18.58 ms` to `11.41 ms`.
+
+### 2026-05-01 - AI mailbox made real by avoiding queued full-frame events
+- Area: AI scheduling / frame handoff
+- Before: the pipeline submitted AI frames through a queued Qt invocation carrying `rawImage.copy()`. When inference was busy, full frame copies could accumulate in the target thread event queue before `YoloProcessor`'s latest-frame mailbox even saw them.
+- After: the pipeline checks `YoloProcessor::wantsFrame()` and calls the thread-safe mailbox directly, so at most one candidate frame is held behind the frame currently being inferred.
+- Expected Effect: bounded AI handoff memory, fewer wasted deep copies, less stale-frame lag, and steadier live display under inference pressure.
+- Validation: Debug build succeeds through `scripts/vscode-qt.ps1 -Action Build`; helper protocol microbenchmarks still return the expected detection count.
+
 ## Future Entries
 
 ### Template

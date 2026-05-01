@@ -16,6 +16,7 @@ class YoloProcessor : public QObject {
 public:
     explicit YoloProcessor(const QString &modelPath, QObject *parent = nullptr);
     ~YoloProcessor();
+    bool wantsFrame();
 
 public slots:
     void initialize();
@@ -51,7 +52,7 @@ private:
     std::atomic<bool> enabled;
     std::atomic<bool> processing;
     bool frameQueued;
-    BackendMode backendMode;
+    std::atomic<int> backendMode;
     QString backendStatus;
 };
 

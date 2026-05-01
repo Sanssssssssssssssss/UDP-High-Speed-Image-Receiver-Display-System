@@ -6,10 +6,12 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QMetaObject>
 #include <QMutexLocker>
 #include <QProcessEnvironment>
 #include <algorithm>
+#include <cmath>
 #include <opencv2/imgproc.hpp>
 
 namespace {
@@ -38,6 +40,77 @@ QStringList buildRepoRelativeCandidates(const QString &tailPath) {
                << QDir(appDir).filePath(QString("../../../%1").arg(tailPath))
                << QDir(currentDir).filePath(tailPath);
     return candidates;
+}
+
+bool writeFully(QProcess *process, const char *data, qint64 size, int timeoutMs, QString &errorText) {
+    qint64 offset = 0;
+    while (offset < size) {
+        if (process->state() != QProcess::Running) {
+            errorText = QString("helper process is not running: %1").arg(process->errorString());
+            return false;
+        }
+
+        const qint64 written = process->write(data + offset, size - offset);
+        if (written < 0) {
+            errorText = QString("helper write failed: %1").arg(process->errorString());
+            return false;
+        }
+
+        if (written == 0) {
+            if (!process->waitForBytesWritten(timeoutMs)) {
+                errorText = QString("helper write timed out: %1").arg(process->errorString());
+                return false;
+            }
+            continue;
+        }
+
+        offset += written;
+    }
+
+    if (!process->waitForBytesWritten(timeoutMs)) {
+        errorText = QString("helper write flush timed out: %1").arg(process->errorString());
+        return false;
+    }
+
+    return true;
+}
+
+QByteArray readLineWithTimeout(QProcess *process, int timeoutMs, QString &errorText) {
+    QByteArray line;
+    QElapsedTimer timer;
+    timer.start();
+
+    while (timer.elapsed() < timeoutMs) {
+        if (process->canReadLine()) {
+            line += process->readLine();
+            break;
+        }
+
+        const QByteArray partial = process->readLine();
+        if (!partial.isEmpty()) {
+            line += partial;
+            if (line.endsWith('\n')) {
+                break;
+            }
+            continue;
+        }
+
+        if (process->state() != QProcess::Running) {
+            errorText = QString("helper process exited: %1").arg(QString::fromUtf8(process->readAllStandardError()).trimmed());
+            return line;
+        }
+
+        const int remainingMs = static_cast<int>(std::max<qint64>(1, timeoutMs - timer.elapsed()));
+        if (!process->waitForReadyRead(remainingMs)) {
+            break;
+        }
+    }
+
+    if (line.isEmpty()) {
+        errorText = QString("helper read timed out: %1").arg(QString::fromUtf8(process->readAllStandardError()).trimmed());
+    }
+
+    return line.trimmed();
 }
 }
 
@@ -83,12 +156,12 @@ bool YoloProcessor::tryLoadOpenCvBackend(QString &statusText) {
         net = cv::dnn::readNetFromONNX(modelPath.toStdString());
         net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
         net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-        backendMode = BackendOpenCv;
+        backendMode.store(BackendOpenCv);
         backendStatus = QString("AI model loaded via OpenCV DNN: %1").arg(modelPath);
         statusText = backendStatus;
         return true;
     } catch (const cv::Exception &e) {
-        backendMode = BackendUnavailable;
+        backendMode.store(BackendUnavailable);
         statusText = QString("OpenCV DNN could not load ONNX: %1").arg(QString::fromStdString(e.what()));
         return false;
     }
@@ -133,9 +206,10 @@ bool YoloProcessor::tryStartPythonHelper(QString &statusText) {
         return false;
     }
 
-    if (!helperProcess->waitForReadyRead(10000)) {
-        const QString stderrText = QString::fromUtf8(helperProcess->readAllStandardError());
-        statusText = QString("Python ONNX fallback did not become ready: %1").arg(stderrText.trimmed());
+    QString readError;
+    const QByteArray line = readLineWithTimeout(helperProcess, 20000, readError);
+    if (line.isEmpty()) {
+        statusText = QString("Python ONNX fallback did not become ready: %1").arg(readError);
         helperProcess->kill();
         helperProcess->waitForFinished(1000);
         delete helperProcess;
@@ -143,7 +217,6 @@ bool YoloProcessor::tryStartPythonHelper(QString &statusText) {
         return false;
     }
 
-    const QByteArray line = helperProcess->readLine().trimmed();
     const QJsonDocument doc = QJsonDocument::fromJson(line);
     if (!doc.isObject() || !doc.object().value("ok").toBool()) {
         const QString stderrText = QString::fromUtf8(helperProcess->readAllStandardError());
@@ -158,10 +231,18 @@ bool YoloProcessor::tryStartPythonHelper(QString &statusText) {
     }
 
     const QString provider = doc.object().value("provider").toString();
-    backendMode = BackendPythonHelper;
+    const QString protocol = doc.object().value("request_protocol").toString();
+    const int intraThreads = doc.object().value("intra_threads").toInt();
+    const int warmupMs = doc.object().value("warmup_ms").toInt();
+    backendMode.store(BackendPythonHelper);
     backendStatus = provider.isEmpty()
         ? QString("AI model loaded via Python ONNX helper: %1").arg(modelPath)
-        : QString("AI model loaded via Python ONNX helper (%1): %2").arg(provider, modelPath);
+        : QString("AI model loaded via Python ONNX helper (%1, protocol=%2, intra=%3, warmup=%4 ms): %5")
+              .arg(provider)
+              .arg(protocol.isEmpty() ? "json" : protocol)
+              .arg(intraThreads)
+              .arg(warmupMs)
+              .arg(modelPath);
     statusText = backendStatus;
     return true;
 }
@@ -174,15 +255,24 @@ void YoloProcessor::setEnabled(bool enabledValue) {
         return;
     }
 
-    if (backendMode == BackendUnavailable) {
+    if (backendMode.load() == BackendUnavailable) {
         emit statusChanged(QString("AI detection cannot start. %1").arg(backendStatus));
     } else {
         emit statusChanged(QString("AI detection is enabled. %1").arg(backendStatus));
     }
 }
 
+bool YoloProcessor::wantsFrame() {
+    if (!enabled.load() || backendMode.load() == BackendUnavailable) {
+        return false;
+    }
+
+    QMutexLocker lock(&frameMutex);
+    return !frameQueued;
+}
+
 void YoloProcessor::submitFrame(const QImage &frame) {
-    if (!enabled.load() || backendMode == BackendUnavailable || frame.isNull()) {
+    if (!enabled.load() || backendMode.load() == BackendUnavailable || frame.isNull()) {
         return;
     }
 
@@ -212,9 +302,10 @@ void YoloProcessor::processLatestFrame() {
 
         int inferenceMs = 0;
         QVector<QRect> boxes;
-        if (backendMode == BackendOpenCv) {
+        const int mode = backendMode.load();
+        if (mode == BackendOpenCv) {
             boxes = runOpenCvInference(frame, inferenceMs);
-        } else if (backendMode == BackendPythonHelper) {
+        } else if (mode == BackendPythonHelper) {
             boxes = runPythonInference(frame, inferenceMs);
         }
         emit detectionsReady(boxes, inferenceMs);
@@ -290,11 +381,11 @@ QVector<QRect> YoloProcessor::runPythonInference(const QImage &frame, int &infer
     const QImage rgbFrame = frame.format() == QImage::Format_RGB888
         ? frame
         : frame.convertToFormat(QImage::Format_RGB888);
-    const QByteArray rawBytes(reinterpret_cast<const char *>(rgbFrame.constBits()),
-                              rgbFrame.bytesPerLine() * rgbFrame.height());
+    const qint64 rawByteCount = static_cast<qint64>(rgbFrame.bytesPerLine()) * static_cast<qint64>(rgbFrame.height());
 
     QJsonObject request;
-    request.insert("image_rgb24", QString::fromLatin1(rawBytes.toBase64()));
+    request.insert("protocol", "rgb24-binary-v1");
+    request.insert("image_rgb24_bytes", static_cast<int>(rawByteCount));
     request.insert("width", rgbFrame.width());
     request.insert("height", rgbFrame.height());
     request.insert("stride", rgbFrame.bytesPerLine());
@@ -303,20 +394,30 @@ QVector<QRect> YoloProcessor::runPythonInference(const QImage &frame, int &infer
     request.insert("nms_score", kNmsScoreThreshold);
     request.insert("nms_threshold", kNmsThreshold);
 
-    helperProcess->write(QJsonDocument(request).toJson(QJsonDocument::Compact));
-    helperProcess->write("\n");
-    helperProcess->waitForBytesWritten(5000);
+    QByteArray header = QJsonDocument(request).toJson(QJsonDocument::Compact);
+    header.append('\n');
 
-    if (!helperProcess->waitForReadyRead(10000)) {
-        backendStatus = QString("Python ONNX helper timed out: %1").arg(QString::fromUtf8(helperProcess->readAllStandardError()).trimmed());
+    QString ioError;
+    if (!writeFully(helperProcess, header.constData(), header.size(), 5000, ioError)
+        || !writeFully(helperProcess, reinterpret_cast<const char *>(rgbFrame.constBits()), rawByteCount, 5000, ioError)) {
+        backendStatus = QString("Python ONNX helper request failed: %1").arg(ioError);
         emit statusChanged(backendStatus);
         return detections;
     }
 
-    const QByteArray line = helperProcess->readLine().trimmed();
-    const QJsonDocument doc = QJsonDocument::fromJson(line);
+    const QByteArray line = readLineWithTimeout(helperProcess, 10000, ioError);
+    if (line.isEmpty()) {
+        backendStatus = QString("Python ONNX helper timed out: %1").arg(ioError);
+        emit statusChanged(backendStatus);
+        return detections;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(line, &parseError);
     if (!doc.isObject()) {
-        backendStatus = QString("Python ONNX helper returned invalid JSON: %1").arg(QString::fromUtf8(line));
+        backendStatus = QString("Python ONNX helper returned invalid JSON: %1 (%2)")
+                            .arg(QString::fromUtf8(line))
+                            .arg(parseError.errorString());
         emit statusChanged(backendStatus);
         return detections;
     }
@@ -328,7 +429,7 @@ QVector<QRect> YoloProcessor::runPythonInference(const QImage &frame, int &infer
         return detections;
     }
 
-    inferenceMs = obj.value("inference_ms").toInt();
+    inferenceMs = static_cast<int>(std::round(obj.value("total_ms").toDouble(obj.value("inference_ms").toDouble())));
     const QJsonArray boxes = obj.value("boxes").toArray();
     detections.reserve(boxes.size());
     for (int i = 0; i < boxes.size(); ++i) {
