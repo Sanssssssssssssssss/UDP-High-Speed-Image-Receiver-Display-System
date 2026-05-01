@@ -42,6 +42,11 @@ QStringList buildRepoRelativeCandidates(const QString &tailPath) {
     return candidates;
 }
 
+bool cppPreprocessEnabled() {
+    const QByteArray value = qgetenv("POST_TRAIN_CPP_PREPROCESS").trimmed().toLower();
+    return value.isEmpty() || value == "1" || value == "true" || value == "yes" || value == "on";
+}
+
 bool writeFully(QProcess *process, const char *data, qint64 size, int timeoutMs, QString &errorText) {
     qint64 offset = 0;
     while (offset < size) {
@@ -312,29 +317,25 @@ void YoloProcessor::processLatestFrame() {
     }
 }
 
-QVector<QRect> YoloProcessor::runOpenCvInference(const QImage &frame, int &inferenceMs) const {
+QVector<QRect> YoloProcessor::runOpenCvInference(const QImage &frame, int &inferenceMs) {
     QVector<QRect> detections;
     cv::Mat rgb(frame.height(), frame.width(), CV_8UC3,
                 const_cast<uchar *>(frame.constBits()), frame.bytesPerLine());
-    cv::Mat bgr;
-    cv::cvtColor(rgb, bgr, cv::COLOR_RGB2BGR);
 
-    cv::Mat blob;
-    cv::dnn::blobFromImage(bgr, blob, 1.0 / 255.0, cv::Size(kModelInputSize, kModelInputSize), cv::Scalar(), true, false);
+    cv::dnn::blobFromImage(rgb, openCvBlob, 1.0 / 255.0, cv::Size(kModelInputSize, kModelInputSize), cv::Scalar(), false, false);
 
     QElapsedTimer timer;
     timer.start();
-    cv::dnn::Net localNet = net;
-    localNet.setInput(blob);
-    std::vector<cv::Mat> outputs;
-    localNet.forward(outputs);
+    net.setInput(openCvBlob);
+    openCvOutputs.clear();
+    net.forward(openCvOutputs);
     inferenceMs = static_cast<int>(timer.elapsed());
 
-    if (outputs.empty()) {
+    if (openCvOutputs.empty()) {
         return detections;
     }
 
-    cv::Mat output = outputs[0].reshape(1, 5).t();
+    cv::Mat output = openCvOutputs[0].reshape(1, 5).t();
     std::vector<cv::Rect> boxes;
     std::vector<float> scores;
     const double scaleX = static_cast<double>(frame.width()) / static_cast<double>(kModelInputSize);
@@ -381,14 +382,39 @@ QVector<QRect> YoloProcessor::runPythonInference(const QImage &frame, int &infer
     const QImage rgbFrame = frame.format() == QImage::Format_RGB888
         ? frame
         : frame.convertToFormat(QImage::Format_RGB888);
-    const qint64 rawByteCount = static_cast<qint64>(rgbFrame.bytesPerLine()) * static_cast<qint64>(rgbFrame.height());
+    const int sourceWidth = rgbFrame.width();
+    const int sourceHeight = rgbFrame.height();
+    const uchar *payloadBits = rgbFrame.constBits();
+    int payloadWidth = sourceWidth;
+    int payloadHeight = sourceHeight;
+    int payloadStride = rgbFrame.bytesPerLine();
+    QString protocol = "rgb24-binary-v1";
+
+    if (cppPreprocessEnabled()) {
+        if (sourceWidth != kModelInputSize || sourceHeight != kModelInputSize) {
+            cv::Mat sourceRgb(sourceHeight, sourceWidth, CV_8UC3,
+                              const_cast<uchar *>(rgbFrame.constBits()),
+                              rgbFrame.bytesPerLine());
+            helperInputRgb.create(kModelInputSize, kModelInputSize, CV_8UC3);
+            cv::resize(sourceRgb, helperInputRgb, cv::Size(kModelInputSize, kModelInputSize), 0.0, 0.0, cv::INTER_LINEAR);
+            payloadBits = helperInputRgb.ptr<uchar>(0);
+            payloadWidth = helperInputRgb.cols;
+            payloadHeight = helperInputRgb.rows;
+            payloadStride = static_cast<int>(helperInputRgb.step);
+        }
+        protocol = "rgb24-resized-binary-v1";
+    }
+
+    const qint64 rawByteCount = static_cast<qint64>(payloadStride) * static_cast<qint64>(payloadHeight);
 
     QJsonObject request;
-    request.insert("protocol", "rgb24-binary-v1");
+    request.insert("protocol", protocol);
     request.insert("image_rgb24_bytes", static_cast<int>(rawByteCount));
-    request.insert("width", rgbFrame.width());
-    request.insert("height", rgbFrame.height());
-    request.insert("stride", rgbFrame.bytesPerLine());
+    request.insert("width", payloadWidth);
+    request.insert("height", payloadHeight);
+    request.insert("stride", payloadStride);
+    request.insert("frame_width", sourceWidth);
+    request.insert("frame_height", sourceHeight);
     request.insert("input_size", kModelInputSize);
     request.insert("confidence", kConfidenceThreshold);
     request.insert("nms_score", kNmsScoreThreshold);
@@ -399,7 +425,7 @@ QVector<QRect> YoloProcessor::runPythonInference(const QImage &frame, int &infer
 
     QString ioError;
     if (!writeFully(helperProcess, header.constData(), header.size(), 5000, ioError)
-        || !writeFully(helperProcess, reinterpret_cast<const char *>(rgbFrame.constBits()), rawByteCount, 5000, ioError)) {
+        || !writeFully(helperProcess, reinterpret_cast<const char *>(payloadBits), rawByteCount, 5000, ioError)) {
         backendStatus = QString("Python ONNX helper request failed: %1").arg(ioError);
         emit statusChanged(backendStatus);
         return detections;

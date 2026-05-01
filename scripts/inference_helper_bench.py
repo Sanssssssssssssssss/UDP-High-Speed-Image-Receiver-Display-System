@@ -82,7 +82,7 @@ def start_helper(args: argparse.Namespace) -> subprocess.Popen:
     )
 
 
-def run_protocol(args: argparse.Namespace, protocol: str, raw: bytes) -> Dict[str, Any]:
+def run_protocol(args: argparse.Namespace, protocol: str, raw: bytes, payload_width: int, payload_height: int) -> Dict[str, Any]:
     proc = start_helper(args)
     assert proc.stdin is not None
     assert proc.stdout is not None
@@ -94,9 +94,11 @@ def run_protocol(args: argparse.Namespace, protocol: str, raw: bytes) -> Dict[st
         raise RuntimeError(f"helper failed to start: {ready} {stderr}")
 
     base_request = {
-        "width": args.width,
-        "height": args.height,
-        "stride": args.width * 3,
+        "width": payload_width,
+        "height": payload_height,
+        "stride": payload_width * 3,
+        "frame_width": args.width,
+        "frame_height": args.height,
         "input_size": args.input_size,
         "confidence": 0.85,
         "nms_score": 0.3,
@@ -114,8 +116,8 @@ def run_protocol(args: argparse.Namespace, protocol: str, raw: bytes) -> Dict[st
     for index in range(args.iterations + args.warmup_iterations):
         request = dict(base_request)
         started = time.perf_counter()
-        if protocol == "binary":
-            request["protocol"] = "rgb24-binary-v1"
+        if protocol == "binary" or protocol == "binary_preresized":
+            request["protocol"] = "rgb24-resized-binary-v1" if protocol == "binary_preresized" else "rgb24-binary-v1"
             request["image_rgb24_bytes"] = len(raw)
             proc.stdin.write(json.dumps(request, separators=(",", ":")).encode("utf-8") + b"\n")
             proc.stdin.write(raw)
@@ -181,10 +183,12 @@ def main() -> int:
     args.python = args.python.resolve()
     args.model = args.model.resolve()
     raw = load_frame(args.repo, args.width, args.height)
+    preresized_raw = load_frame(args.repo, args.input_size, args.input_size)
 
     results = [
-        run_protocol(args, "base64", raw),
-        run_protocol(args, "binary", raw),
+        run_protocol(args, "base64", raw, args.width, args.height),
+        run_protocol(args, "binary", raw, args.width, args.height),
+        run_protocol(args, "binary_preresized", preresized_raw, args.input_size, args.input_size),
     ]
     print(json.dumps(results, indent=2, ensure_ascii=False))
     return 0

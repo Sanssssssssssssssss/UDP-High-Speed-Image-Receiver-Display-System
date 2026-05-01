@@ -187,6 +187,20 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - Expected Effect: bounded AI handoff memory, fewer wasted deep copies, less stale-frame lag, and steadier live display under inference pressure.
 - Validation: Debug build succeeds through `scripts/vscode-qt.ps1 -Action Build`; helper protocol microbenchmarks still return the expected detection count.
 
+### 2026-05-01 - Helper resize moved out of Python for the hot binary path
+- Area: AI preprocessing / helper transport
+- Before: the optimized binary protocol still sent the live `400x400` frame to Python, where `Pillow` resized it to the model's `416x416` input before NCHW float conversion.
+- After: `YoloProcessor` now defaults to OpenCV-side `416x416` RGB resize before sending the helper request, and includes the original frame dimensions separately for box scaling. The helper detects pre-sized RGB24 payloads and uses a direct NumPy view path that skips `Pillow` entirely. Set `POST_TRAIN_CPP_PREPROCESS=0` to fall back to helper-side resize.
+- Expected Effect: lower helper-side preprocessing latency while preserving detection output coordinates and keeping the compatibility paths available.
+- Validation: `scripts/inference_helper_bench.py --provider CPUExecutionProvider --intra-threads 4 --iterations 120 --warmup-iterations 10` measured binary `400x400` round-trip mean at `22.61 ms` and pre-resized `416x416` at `16.84 ms`; `DmlExecutionProvider` measured `9.17 ms` vs `7.73 ms`. Debug build succeeds and `build-vscode/debug/newudp.exe --demo` stays running after an 8 second smoke launch.
+
+### 2026-05-01 - Native OpenCV DNN inference path trims redundant frame work
+- Area: AI inference hot path
+- Before: the OpenCV backend converted the already-RGB `QImage` into BGR, then called `blobFromImage` with `swapRB=true`, effectively swapping back to RGB before inference. It also created a local `Net` handle and fresh output vector on every frame.
+- After: the OpenCV backend now feeds the RGB frame directly with `swapRB=false`, reuses the per-processor blob/output buffers, and forwards through the existing `net` instance on the single inference worker path.
+- Expected Effect: lower per-frame CPU and allocation overhead when OpenCV can import the ONNX model, without changing the model channel order, thresholds, NMS, or output coordinate mapping.
+- Validation: Debug build succeeds and `build-vscode/debug/newudp.exe --demo` stays running after an 8 second smoke launch.
+
 ## Future Entries
 
 ### Template
@@ -204,3 +218,10 @@ This file records receiver, rendering, recording, and future YOLO-path optimizat
 - SIMD/OpenMP changes in pre/postprocess
 - queueing / drop policy changes
 - measured latency or throughput deltas
+
+### Planned future area: DMA / zero-copy receiver infrastructure
+- Keep true DMA work below the inference boundary, at the ingress and buffer-ownership layer.
+- For UDP, focus on receive batching, socket buffers, reusable packet slabs, and fewer kernel-to-app follow-on copies.
+- For FT601, use overlapped read rings and preallocated transfer buffers inside `Ft601Receiver`.
+- For future PCIe FPGA ingress, design a driver-owned pinned-memory descriptor ring and expose completed buffer indices to the app instead of copying payload bytes.
+- Add metrics for per-frame copy count, queue depth, frame age P95/P99, drop reason, and ingress CPU cost.

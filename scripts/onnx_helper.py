@@ -133,7 +133,7 @@ def decode_frame(req, input_stream):
         height = int(req["height"])
         stride = int(req.get("stride", width * 3))
         raw = read_binary_payload(input_stream, int(req["image_rgb24_bytes"]))
-        return raw, width, height, stride, "rgb24-binary"
+        return raw, width, height, stride, req.get("protocol", "rgb24-binary")
 
     if "image_rgb24" in req:
         width = int(req["width"])
@@ -170,11 +170,14 @@ class InferenceEngine:
             input_h = input_size
             input_w = input_size
 
-        image = Image.frombuffer("RGB", (width, height), raw, "raw", "RGB", stride, 1)
-        if image.size != (input_w, input_h):
+        if width == input_w and height == input_h:
+            row_data = np.frombuffer(raw, dtype=np.uint8).reshape(height, stride)
+            resized_u8 = row_data[:, : width * 3].reshape(height, width, 3)
+        else:
+            image = Image.frombuffer("RGB", (width, height), raw, "raw", "RGB", stride, 1)
             image = image.resize((input_w, input_h), Image.BILINEAR)
+            resized_u8 = np.asarray(image, dtype=np.uint8)
 
-        resized_u8 = np.asarray(image, dtype=np.uint8)
         blob = self.blob_for_size(input_h, input_w)
         np.multiply(np.transpose(resized_u8, (2, 0, 1)), 1.0 / 255.0, out=blob[0], casting="unsafe")
         return blob, input_w
@@ -313,6 +316,8 @@ def main():
             confidence = float(req.get("confidence", 0.85))
             nms_score = float(req.get("nms_score", 0.3))
             nms_threshold = float(req.get("nms_threshold", 0.5))
+            frame_width = int(req.get("frame_width", width))
+            frame_height = int(req.get("frame_height", height))
 
             blob, effective_input_size = engine.preprocess_rgb24(raw, width, height, stride, input_size)
             preprocess_done = time.perf_counter()
@@ -320,7 +325,7 @@ def main():
             outputs = engine.run(blob)
             inference_done = time.perf_counter()
 
-            packed = engine.decode_outputs(outputs, width, height, effective_input_size, confidence, nms_score, nms_threshold)
+            packed = engine.decode_outputs(outputs, frame_width, frame_height, effective_input_size, confidence, nms_score, nms_threshold)
             postprocess_done = time.perf_counter()
 
             emit({

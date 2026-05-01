@@ -8,6 +8,7 @@
 #include <QRect>
 #include <QVector>
 #include <atomic>
+#include <vector>
 #include <opencv2/dnn.hpp>
 
 class YoloProcessor : public QObject {
@@ -39,7 +40,7 @@ private:
 
     bool tryLoadOpenCvBackend(QString &statusText);
     bool tryStartPythonHelper(QString &statusText);
-    QVector<QRect> runOpenCvInference(const QImage &frame, int &inferenceMs) const;
+    QVector<QRect> runOpenCvInference(const QImage &frame, int &inferenceMs);
     QVector<QRect> runPythonInference(const QImage &frame, int &inferenceMs);
 
     QString modelPath;
@@ -47,6 +48,9 @@ private:
     QString helperScriptPath;
     cv::dnn::Net net;
     QProcess *helperProcess;
+    cv::Mat openCvBlob;
+    std::vector<cv::Mat> openCvOutputs;
+    cv::Mat helperInputRgb;
     QMutex frameMutex;
     QImage latestFrame;
     std::atomic<bool> enabled;
