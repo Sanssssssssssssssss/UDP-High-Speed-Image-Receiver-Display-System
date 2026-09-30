@@ -1,5 +1,5 @@
 # CPU fallback runtime; optional for the native Qt/OpenCV application.
-numpy==2.2.6
+numpy==2.5.3
 onnxruntime==1.22.1
 Pillow==11.3.0
 coloredlogs==15.0.1
