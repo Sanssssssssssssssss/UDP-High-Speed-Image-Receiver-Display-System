@@ -30,7 +30,10 @@ def main():
     # Refuse stale packages instead of deleting a caller-provided directory.
     stage.mkdir(parents=True, exist_ok=False)
     run("cmake", "--install", args.build_dir, "--config", "Release", "--prefix", stage)
-    plugin_root = Path(subprocess.check_output(["qmake", "-query", "QT_INSTALL_PLUGINS"], text=True).strip())
+    qmake = shutil.which("qmake-qt5") or shutil.which("qmake")
+    if not qmake:
+        raise RuntimeError("Qt 5 qmake (qmake-qt5 on MSYS2) must be on PATH")
+    plugin_root = Path(subprocess.check_output([qmake, "-query", "QT_INSTALL_PLUGINS"], text=True).strip())
     # Copy explicit plugins: old Qt deployment tools can misclassify release DLLs
     # with debug symbols. No plugin heuristics or unrelated QML modules needed.
     for relative in ["platforms/qwindows.dll", "platforms/qoffscreen.dll",
@@ -67,11 +70,12 @@ def main():
     licenses.mkdir(exist_ok=True)
     shutil.copytree(ROOT / "licenses", licenses, dirs_exist_ok=True)
     # MSYS2 supplies exact license texts for the dependency distribution used in CI.
-    qmake = shutil.which("qmake")
     if qmake:
         installed_licenses = Path(qmake).parent.parent / "share/licenses"
         if installed_licenses.is_dir():
             shutil.copytree(installed_licenses, licenses / "toolchain", dirs_exist_ok=True)
+    if (ROOT / "dependencies-windows.txt").exists():
+        shutil.copy2(ROOT / "dependencies-windows.txt", stage)
 
     # Validate relocation: run outside the checkout, without compiler/Qt/OpenCV PATH.
     env = os.environ.copy()

@@ -71,8 +71,10 @@ struct pcap_pkthdr {
     unsigned int len;
 };
 typedef void (__cdecl *pcap_handler)(unsigned char *, const pcap_pkthdr *, const unsigned char *);
+#endif
 }
 
+#ifdef Q_OS_WIN
 class NpcapCaptureSession {
 public:
     explicit NpcapCaptureSession(UdpReceiver *owner)
@@ -506,7 +508,9 @@ UdpReceiver::UdpReceiver(QObject *parent)
 
 UdpReceiver::~UdpReceiver() {
     stopReceiving();
+#ifdef Q_OS_WIN
     delete npcapSession;
+#endif
     npcapSession = nullptr;
 
     if (tsharkProcess && tsharkProcess->state() == QProcess::Running) {
@@ -584,9 +588,11 @@ void UdpReceiver::startReceiving(const QString &address, quint16 port, bool useN
 }
 
 void UdpReceiver::stopReceiving() {
+#ifdef Q_OS_WIN
     if (npcapSession != nullptr) {
         npcapSession->stop();
     }
+#endif
 
     if (!mrecv->isOpen()) {
         return;

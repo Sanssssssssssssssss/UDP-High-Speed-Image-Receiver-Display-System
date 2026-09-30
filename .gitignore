@@ -10,3 +10,4 @@ __pycache__/
 *.autosave
 /CMakeUserPresets.json
 /.vscode/toolchain.snapshot.json
+/dependencies-*.txt
