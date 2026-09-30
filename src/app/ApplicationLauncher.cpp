@@ -21,6 +21,8 @@ record video.
 #include "UdpFrameProcessor.h"
 #include "UdpReceiver.h"
 #include <QApplication>
+#include <QCommandLineParser>
+#include <QDebug>
 #include <QByteArray>
 #include <QColor>
 #include <QCoreApplication>
@@ -248,6 +250,17 @@ private:
 int runApplication(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setFont(QFont("Segoe UI", 11));
+    QCoreApplication::setApplicationName("udp-vision");
+    QCoreApplication::setApplicationVersion("1.0.0");
+    QCommandLineParser parser;
+    parser.setApplicationDescription("UDP image receiver and Qt vision console");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addOption({"demo", "Send protocol-compatible loopback demo traffic."});
+    parser.addOption({"capture-bootstrap", "Start tshark from TSHARK_PATH or PATH."});
+    parser.addOption({"smoke-test", "Check presented frames and exit after 5 seconds."});
+    parser.addOption({"screenshot", "Save the widget as PNG before smoke-test exit.", "path"});
+    parser.process(app);
     const QStringList args = app.arguments();
     const bool enableDemo = args.contains("--demo") || qEnvironmentVariableIntValue("POST_TRAIN_DEMO") == 1;
     const bool enableCaptureBootstrap = args.contains("--capture-bootstrap") || qEnvironmentVariableIntValue("POST_TRAIN_CAPTURE") == 1;
@@ -440,5 +453,17 @@ int runApplication(int argc, char *argv[]) {
     mainWidget.setLayout(mainLayout);
     mainWidget.show();
 
+    // Exercise real UDP reception, worker handoff, presentation and shutdown.
+    int observedFrames = 0;
+    QObject::connect(videoDisplay, &UdpFrameProcessor::fpsChanged, &app,
+                     [&](int fps) { observedFrames += fps; });
+    if (parser.isSet("smoke-test")) {
+        QTimer::singleShot(5000, &app, [&]() {
+            const QString screenshot = parser.value("screenshot");
+            const bool saved = screenshot.isEmpty() || mainWidget.grab().save(screenshot);
+            qInfo() << "Smoke test: presented frames=" << observedFrames << "screenshot saved=" << saved;
+            app.exit(observedFrames > 1 && saved ? 0 : 1);
+        });
+    }
     return app.exec();
 }

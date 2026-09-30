@@ -1,6 +1,4 @@
 {
-  "files.associations": {
-    "*.pro": "qmake"
-  },
-  "terminal.integrated.defaultProfile.windows": "PowerShell"
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "cmake.buildDirectory": "${workspaceFolder}/build"
 }

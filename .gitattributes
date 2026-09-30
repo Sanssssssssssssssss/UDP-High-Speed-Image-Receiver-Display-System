@@ -1,0 +1,11 @@
+* text=auto
+*.cpp text eol=lf
+*.h text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.ps1 text eol=lf
+*.png binary
+*.onnx binary
+# Upstream license documentation uses long equals-sign headings.
+licenses/** conflict-marker-size=32

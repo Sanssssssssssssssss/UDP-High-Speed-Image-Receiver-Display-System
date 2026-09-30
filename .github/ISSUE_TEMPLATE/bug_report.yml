@@ -1,0 +1,21 @@
+name: Bug report / 问题反馈
+description: Report a reproducible receiver, UI, inference or packaging issue.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and environment / 版本与环境
+      description: Commit or package name, OS, Qt/OpenCV, ingress mode and device.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected and actual result / 复现步骤与结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs and screenshots / 日志与截图
+      description: Include the performance panel; remove private addresses and image content.

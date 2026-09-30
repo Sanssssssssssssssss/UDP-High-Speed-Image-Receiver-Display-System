@@ -2,70 +2,45 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Toolchain: Diagnose local Qt environment",
-      "type": "shell",
-      "command": "powershell",
+      "label": "Configure",
+      "type": "process",
+      "command": "cmake",
       "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
-        "-Action",
-        "Diagnose"
+        "-S",
+        ".",
+        "-B",
+        "build",
+        "-DCMAKE_BUILD_TYPE=Release"
       ],
       "problemMatcher": []
     },
     {
-      "label": "Build: newudp (Debug)",
-      "type": "shell",
-      "command": "powershell",
+      "label": "Build",
+      "type": "process",
+      "command": "cmake",
       "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
-        "-Action",
-        "Build"
+        "--build",
+        "build",
+        "--parallel",
+        "2"
       ],
+      "dependsOn": "Configure",
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "dependsOn": "Toolchain: Diagnose local Qt environment",
-      "dependsOrder": "sequence",
       "problemMatcher": "$gcc"
     },
     {
-      "label": "Run: newudp (Hardware)",
-      "type": "shell",
-      "command": "powershell",
+      "label": "Test",
+      "type": "process",
+      "command": "ctest",
       "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
-        "-Action",
-        "Run"
+        "--test-dir",
+        "build",
+        "--output-on-failure"
       ],
-      "dependsOn": "Build: newudp (Debug)",
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Run: newudp (Demo)",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\vscode-qt.ps1",
-        "-Action",
-        "Run",
-        "-Demo"
-      ],
-      "dependsOn": "Build: newudp (Debug)",
-      "dependsOrder": "sequence",
+      "dependsOn": "Build",
       "problemMatcher": []
     }
   ]

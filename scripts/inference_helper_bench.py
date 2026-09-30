@@ -73,7 +73,7 @@ def start_helper(args: argparse.Namespace) -> subprocess.Popen:
     env["POST_TRAIN_ORT_WARMUP"] = "1" if args.warmup else "0"
 
     return subprocess.Popen(
-        [str(args.python), "scripts/onnx_helper.py", str(args.model)],
+        [str(args.python), "src/backend/inference/onnx_helper.py", str(args.model)],
         cwd=str(args.repo),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,

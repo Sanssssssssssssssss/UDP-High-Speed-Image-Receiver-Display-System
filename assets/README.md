@@ -1,6 +1,6 @@
 # Demo Reference Asset
 
-Place the exact demo reference image here if you want the built-in UDP demo to reproduce it pixel-by-pixel.
+Place the exact demo reference image here if you want the built-in UDP demo to use it as a source image (resize, pulsing and RGB565 quantization change pixels).
 
 Supported filenames:
 - `demo_reference.png`
