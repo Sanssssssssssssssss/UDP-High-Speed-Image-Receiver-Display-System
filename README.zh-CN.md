@@ -6,7 +6,7 @@
 
 [English](README.md) · **简体中文**
 
-[![CI](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml/badge.svg?branch=Post-Train)](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml)
+[![CI](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![C++14](https://img.shields.io/badge/C%2B%2B-14-00599C)
 ![Qt Widgets](https://img.shields.io/badge/UI-Qt_Widgets-41CD52)
@@ -18,8 +18,8 @@
 基于 Qt/C++ 的桌面应用，通过 UDP 接收 RGB565 图像流，完成帧重建、图像调节、截图和录像。
 可选的 ONNX 检测在独立线程运行。内置本地 UDP 发送器，没有 FPGA 也能运行完整接收与显示流程。
 
-> **当前开发版本：`Post-Train`。** 最新处理流水线、控制界面和推理功能均在此分支；
-> `main` 保留历史实现。
+> **当前开发版本：`main`。** 最新处理流水线、控制界面、推理功能及仓库整理结果
+> 已从 `Post-Train` 合并到主分支。
 
 ![当前桌面程序运行本地 UDP demo](docs/images/console-demo.png)
 
@@ -47,7 +47,7 @@
 ### Windows 便携包
 
 进入 [Actions](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml)，
-选择最新成功的 **Post-Train** 工作流，下载 `windows-portable-and-test`，
+选择最新成功的 **main** 工作流，下载 `windows-portable-and-test`，
 再解压其中的 `udp-vision-windows-x64.zip`。保留完整目录结构，运行：
 
 ```powershell
@@ -61,7 +61,7 @@
 ### 从源码构建
 
 ```bash
-git clone --branch Post-Train https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System.git
+git clone --branch main https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System.git
 cd UDP-High-Speed-Image-Receiver-Display-System
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 2

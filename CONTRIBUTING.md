@@ -2,7 +2,7 @@
 
 [English](CONTRIBUTING.md) · [中文说明](README.zh-CN.md)
 
-Base changes on `Post-Train`. `main` is the historical version. Follow the setup in
+Base changes on `main`, which includes the latest `Post-Train` development. Follow the setup in
 [BUILDING.md](docs/BUILDING.md), then run `ctest --test-dir build --output-on-failure`
 and `python -m unittest discover -s tests -p 'test_*.py' -v`.
 

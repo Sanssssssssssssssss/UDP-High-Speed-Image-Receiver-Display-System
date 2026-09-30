@@ -1,6 +1,6 @@
 # Build and run / 构建与运行
 
-Use `Post-Train`. The only supported build entry point is root `CMakeLists.txt`;
+Use `main`. The only supported build entry point is root `CMakeLists.txt`;
 files under `legacy/` are historical references.
 
 ## Dependencies

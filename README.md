@@ -6,7 +6,7 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-[![CI](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml/badge.svg?branch=Post-Train)](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml)
+[![CI](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![C++14](https://img.shields.io/badge/C%2B%2B-14-00599C)
 ![Qt Widgets](https://img.shields.io/badge/UI-Qt_Widgets-41CD52)
@@ -20,8 +20,8 @@ reconstructing frames, adjusting images, saving snapshots and recording video.
 Optional ONNX detection runs on a separate worker. A built-in loopback sender
 exercises the complete receive/display path without an FPGA.
 
-> **Active version: `Post-Train`.** This branch contains the current pipeline,
-> desktop controls and inference integration. `main` is a historical implementation.
+> **Active version: `main`.** The latest pipeline, desktop controls, inference
+> integration and repository cleanup have been merged from `Post-Train`.
 
 ![Current desktop console receiving the local demo](docs/images/console-demo.png)
 
@@ -50,7 +50,7 @@ reconstructed exactly. See [protocol and loss behavior](docs/PROTOCOL.md).
 
 ### Windows portable package
 
-Open the latest successful **Post-Train** run in
+Open the latest successful **main** run in
 [Actions](https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System/actions/workflows/ci.yml),
 download `windows-portable-and-test`, then extract the inner
 `udp-vision-windows-x64.zip`. Keep the directories together and run:
@@ -67,7 +67,7 @@ Builds are unsigned. GitHub may require sign-in to download CI artifacts.
 ### Build from source
 
 ```bash
-git clone --branch Post-Train https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System.git
+git clone --branch main https://github.com/Sanssssssssssssssss/UDP-High-Speed-Image-Receiver-Display-System.git
 cd UDP-High-Speed-Image-Receiver-Display-System
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 2
