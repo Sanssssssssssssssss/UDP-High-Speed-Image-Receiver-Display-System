@@ -46,7 +46,7 @@ jobs:
           python -m pip check
       - name: Package Linux application (system Qt/OpenCV required)
         run: cd build && cpack
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: linux-build-and-test
@@ -100,7 +100,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & $python scripts/package_windows.py
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: windows-portable-and-test
